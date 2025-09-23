@@ -8,7 +8,7 @@ let currentPollInterval = 15000; // Track current polling interval
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Dashboard initializing...');
     refreshStatus();
-    loadStockData();
+    loadTickerCount();
     loadLogs();
     
     // Start periodic status updates
@@ -148,78 +148,31 @@ async function startJob() {
     }
 }
 
-// Load stock data
-async function loadStockData() {
-    const loadingDiv = document.getElementById('stock-data-loading');
-    const tableContainer = document.getElementById('stock-data-table-container');
-    
+// Load ticker count for summary display
+async function loadTickerCount() {
     try {
-        // Show loading state
-        loadingDiv.style.display = 'block';
-        tableContainer.style.opacity = '0.5';
-        
         const response = await fetch('/data');
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
         
         const data = await response.json();
-        updateStockDataTable(data);
+        const totalTickers = document.getElementById('total-tickers');
+        
+        if (data && data.stocks) {
+            totalTickers.textContent = data.stocks.length;
+        } else {
+            totalTickers.textContent = '0';
+        }
         
     } catch (error) {
-        console.error('Error loading stock data:', error);
-        showError('Failed to load stock data: ' + error.message);
-    } finally {
-        // Hide loading state
-        loadingDiv.style.display = 'none';
-        tableContainer.style.opacity = '1';
+        console.error('Error loading ticker count:', error);
+        const totalTickers = document.getElementById('total-tickers');
+        totalTickers.textContent = '-';
     }
 }
 
-// Update stock data table
-function updateStockDataTable(data) {
-    const tbody = document.getElementById('stock-data-tbody');
-    const totalTickers = document.getElementById('total-tickers');
-    const downloadBtn = document.getElementById('download-excel-btn');
-    
-    if (!data || !data.stocks || data.stocks.length === 0) {
-        tbody.innerHTML = `
-            <tr>
-                <td colspan="10" class="text-center text-muted py-4">
-                    No stock data available. Run stock fetch job to populate data.
-                </td>
-            </tr>
-        `;
-        totalTickers.textContent = '0';
-        // Hide download button when no data
-        if (downloadBtn) {
-            downloadBtn.style.display = 'none';
-        }
-        return;
-    }
-    
-    totalTickers.textContent = data.stocks.length;
-    
-    // Show download button when data is available
-    if (downloadBtn) {
-        downloadBtn.style.display = 'inline-block';
-    }
-    
-    tbody.innerHTML = data.stocks.map(stock => `
-        <tr>
-            <td class="fw-bold">${stock.Ticker || 'N/A'}</td>
-            <td class="text-price">${formatPrice(stock.Price)}</td>
-            <td class="text-price">${formatPrice(stock['52w_High'])}</td>
-            <td class="text-price">${formatPrice(stock['52w_Low'])}</td>
-            <td>${formatMarketCap(stock.MarketCap)}</td>
-            <td>${formatPERatio(stock.PE_Ratio)}</td>
-            <td class="text-price">${formatPrice(stock.Pivot_Support_1)}</td>
-            <td class="text-price">${formatPrice(stock.Pivot_Resistance_1)}</td>
-            <td class="text-price">${formatPrice(stock.Recent_Support)}</td>
-            <td class="text-price">${formatPrice(stock.Recent_Resistance)}</td>
-        </tr>
-    `).join('');
-}
+
 
 // Load logs
 async function loadLogs() {
@@ -307,8 +260,8 @@ async function addTicker() {
                 }
             }
             
-            // Refresh data
-            loadStockData();
+            // Refresh ticker count
+            loadTickerCount();
         }
         
     } catch (error) {
@@ -317,26 +270,7 @@ async function addTicker() {
     }
 }
 
-// Download Excel file
-async function downloadExcel() {
-    try {
-        showSuccess('Downloading Excel file...');
-        
-        // Create a temporary link element and trigger download
-        const link = document.createElement('a');
-        link.href = '/download-excel';
-        link.download = ''; // Let the server set the filename
-        
-        // Append to body, click, and remove
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        
-    } catch (error) {
-        console.error('Error downloading Excel file:', error);
-        showError('Failed to download Excel file: ' + error.message);
-    }
-}
+
 
 // Utility functions
 function formatPrice(price) {
