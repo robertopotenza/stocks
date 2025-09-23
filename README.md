@@ -83,6 +83,15 @@ After running the script, the Excel file will be updated with additional columns
 - **Pivot_Resistance_2**: Secondary pivot-based resistance level
 - **Recent_Support**: Recent support level based on 20-day price action
 - **Recent_Resistance**: Recent resistance level based on 20-day price action
+- **Risk_Reward_Ratio**: Risk/reward ratio based on support/resistance levels
+- **Distance_from_52w_High_Pct**: Percentage distance from 52-week high
+- **Distance_from_52w_Low_Pct**: Percentage distance from 52-week low
+- **Upside_Potential_Pct**: Upside potential percentage based on pivot resistance
+- **Downside_Risk_Pct**: Downside risk percentage based on pivot support
+- **PEG_Ratio**: Price/Earnings to Growth ratio (currently N/A - requires growth data)
+- **Valuation_Flag**: Valuation assessment (Undervalued/Fair Value/Overvalued)
+- **Entry_Opportunity_Flag**: Entry opportunity assessment (Favorable/Neutral/Unfavorable)
+- **Price_Level_Flag**: Price level assessment (Near Top/Mid Range/Near Bottom)
 
 ## Usage
 
@@ -177,11 +186,14 @@ MFA Code (press Enter if no MFA):
          STOCK DATA SUMMARY
 ======================================================================
     AAPL: $    150.25 | 52w: $  199.62-$  124.17 | Cap: 2400000000000 | P/E:  28.50
-          Pivot S/R: $147.83-$152.67 | Recent S/R: $145.20-$155.10
+          Pivot S/R: $147.83-$152.67 | Recent S/R: $145.20-$155.10 | R/R: 2.00
+          52w Dist: H24.7% L21.0% | Val: Fair Value | Entry: Neutral | Level: Mid Range
    GOOGL: $   2750.80 | 52w: $ 3030.93-$ 2193.62 | Cap: 1800000000000 | P/E:  25.20
-          Pivot S/R: $2685.42-$2816.18 | Recent S/R: $2650.00-$2850.00
+          Pivot S/R: $2685.42-$2816.18 | Recent S/R: $2650.00-$2850.00 | R/R: 1.98
+          52w Dist: H9.2% L25.4% | Val: Fair Value | Entry: Neutral | Level: Mid Range
     MSFT: $    310.15 | 52w: $  384.30-$  247.11 | Cap: 2300000000000 | P/E:  31.80
-          Pivot S/R: $302.14-$318.16 | Recent S/R: $295.50-$325.00
+          Pivot S/R: $302.14-$318.16 | Recent S/R: $295.50-$325.00 | R/R: 2.01
+          52w Dist: H19.3% L25.5% | Val: Overvalued | Entry: Favorable | Level: Mid Range
     TSLA: $    245.60 | 52w: $  414.50-$  152.37 | Cap: 780000000000  | P/E:  67.20
     AMZN: $   3200.75 | 52w: $ 3773.08-$ 2025.20 | Cap: 1650000000000 | P/E:  58.90
     META: $    325.60 | 52w: $  384.33-$  199.50 | Cap: 825000000000  | P/E:  24.80
@@ -194,11 +206,13 @@ MFA Code (press Enter if no MFA):
 
 The Excel file (`tickers.xlsx`) will be updated with new columns containing the fetched data:
 
-| Ticker | Price  | 52w_High | 52w_Low | MarketCap      | PE_Ratio | Pivot_Support_1 | Pivot_Resistance_1 | Recent_Support | Recent_Resistance |
-|--------|--------|----------|---------|----------------|----------|-----------------|-------------------|----------------|-------------------|
-| AAPL   | 150.25 | 199.62   | 124.17  | 2400000000000  | 28.5     | 147.83          | 152.67            | 145.20         | 155.10            |
-| GOOGL  | 2750.80| 3030.93  | 2193.62 | 1800000000000  | 25.2     | 2685.42         | 2816.18           | 2650.00        | 2850.00           |
-| ...    | ...    | ...      | ...     | ...            | ...      | ...             | ...               | ...            | ...               |
+| Ticker | Price  | 52w_High | 52w_Low | MarketCap      | PE_Ratio | Risk_Reward_Ratio | Distance_from_52w_High_Pct | Valuation_Flag | Entry_Opportunity_Flag |
+|--------|--------|----------|---------|----------------|----------|-------------------|----------------------------|----------------|------------------------|
+| AAPL   | 150.25 | 199.62   | 124.17  | 2400000000000  | 28.5     | 2.00              | 24.7                       | Fair Value     | Neutral                |
+| GOOGL  | 2750.80| 3030.93  | 2193.62 | 1800000000000  | 25.2     | 1.98              | 9.2                        | Fair Value     | Neutral                |
+| ...    | ...    | ...      | ...     | ...            | ...      | ...               | ...                        | ...            | ...                    |
+
+*Note: This table shows a subset of columns. The full Excel output includes all technical analysis columns (support/resistance levels), financial metrics (upside/downside potential), and assessment flags.*
 
 ## Technical Analysis
 
