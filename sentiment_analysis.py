@@ -26,7 +26,12 @@ class SentimentAnalyzer:
     
     def __init__(self):
         """Initialize sentiment analyzers."""
-        self.sia = SentimentIntensityAnalyzer()
+        try:
+            self.sia = SentimentIntensityAnalyzer()
+        except LookupError as e:
+            logger.warning(f"NLTK VADER lexicon not available: {e}")
+            logger.warning("Sentiment analysis will use TextBlob only")
+            self.sia = None
     
     def analyze_text(self, text: str) -> Dict[str, Any]:
         """
@@ -51,27 +56,46 @@ class SentimentAnalyzer:
         polarity = blob.sentiment.polarity
         subjectivity = blob.sentiment.subjectivity
         
-        # VADER analysis
-        vader_scores = self.sia.polarity_scores(text)
-        compound = vader_scores['compound']
-        
-        # Determine classification based on compound score
-        if compound >= 0.05:
-            classification = 'positive'
-        elif compound <= -0.05:
-            classification = 'negative'
+        # VADER analysis (if available)
+        if self.sia:
+            vader_scores = self.sia.polarity_scores(text)
+            compound = vader_scores['compound']
+            
+            # Determine classification based on compound score
+            if compound >= 0.05:
+                classification = 'positive'
+            elif compound <= -0.05:
+                classification = 'negative'
+            else:
+                classification = 'neutral'
+            
+            return {
+                'polarity': polarity,
+                'subjectivity': subjectivity,
+                'compound': compound,
+                'classification': classification,
+                'pos': vader_scores['pos'],
+                'neu': vader_scores['neu'],
+                'neg': vader_scores['neg']
+            }
         else:
-            classification = 'neutral'
-        
-        return {
-            'polarity': polarity,
-            'subjectivity': subjectivity,
-            'compound': compound,
-            'classification': classification,
-            'pos': vader_scores['pos'],
-            'neu': vader_scores['neu'],
-            'neg': vader_scores['neg']
-        }
+            # Fall back to TextBlob-only analysis
+            if polarity >= 0.1:
+                classification = 'positive'
+            elif polarity <= -0.1:
+                classification = 'negative'
+            else:
+                classification = 'neutral'
+            
+            return {
+                'polarity': polarity,
+                'subjectivity': subjectivity,
+                'compound': polarity,  # Use polarity as compound score fallback
+                'classification': classification,
+                'pos': max(0, polarity),  # Approximate positive score
+                'neu': 1 - abs(polarity),  # Approximate neutral score
+                'neg': max(0, -polarity)  # Approximate negative score
+            }
 
 class RedditSentimentFetcher:
     """Fetches and analyzes sentiment from Reddit."""
