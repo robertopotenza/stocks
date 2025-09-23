@@ -14,6 +14,10 @@ import os
 import sys
 from typing import Dict, List, Any
 from technical_analysis import calculate_technical_levels
+from logging_config import get_logger
+
+# Get logger instance
+logger = get_logger('stocks_app.stock_prices')
 
 # Configuration variables - can be set via environment variables or modified here
 USERNAME = os.getenv("ROBINHOOD_USERNAME", "your_email")
@@ -57,20 +61,20 @@ def login_to_robinhood(username: str, password: str) -> bool:
                     mfa_code = None
             else:
                 # In headless environment, skip MFA prompt and proceed without it
-                print("ℹ️  Running in headless environment - skipping MFA prompt")
-                print("   Set ROBINHOOD_MFA environment variable if MFA is required")
+                logger.info("Running in headless environment - skipping MFA prompt")
+                logger.info("Set ROBINHOOD_MFA environment variable if MFA is required")
                 mfa_code = None
 
         login = r.login(username, password, mfa_code=mfa_code)
 
         if login:
-            print("✓ Successfully logged into Robinhood")
+            logger.info("Successfully logged into Robinhood")
             return True
         else:
-            print("✗ Failed to login to Robinhood")
+            logger.error("Failed to login to Robinhood")
             return False
     except Exception as e:
-        print(f"✗ Login error: {e}")
+        logger.error(f"Login error: {e}")
         return False
 
 
@@ -92,10 +96,10 @@ def load_tickers_from_excel(file_path: str) -> List[str]:
             raise ValueError("Excel file must have a 'Ticker' column")
             
         tickers = df["Ticker"].dropna().tolist()
-        print(f"✓ Loaded {len(tickers)} tickers from {file_path}")
+        logger.info(f"Loaded {len(tickers)} tickers from {file_path}")
         return tickers
     except Exception as e:
-        print(f"✗ Error loading tickers from {file_path}: {e}")
+        logger.error(f"Error loading tickers from {file_path}: {e}")
         return []
 
 
@@ -113,7 +117,7 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
     results = {}
     total_tickers = len(tickers)
     
-    print(f"\n📈 Fetching stock data for {total_tickers} tickers...")
+    logger.info(f"Fetching stock data for {total_tickers} tickers...")
     
     for i, ticker in enumerate(tickers, 1):
         stock_data = {
@@ -164,7 +168,7 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
                     stock_data['PE_Ratio'] = float(pe_ratio)
             
             # Calculate technical levels (Support & Resistance)
-            print(f"  {i}/{total_tickers} {ticker}: Calculating technical levels...")
+            logger.debug(f"{i}/{total_tickers} {ticker}: Calculating technical levels...")
             technical_levels = calculate_technical_levels(ticker)
             
             # Add technical analysis results
@@ -178,8 +182,8 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
             })
             
             results[ticker] = stock_data
-            print(f"  {i}/{total_tickers} {ticker}: ${stock_data['Price']} | "
-                  f"Sup: {stock_data['Pivot_Support_1']} | Res: {stock_data['Pivot_Resistance_1']}")
+            logger.info(f"{i}/{total_tickers} {ticker}: ${stock_data['Price']} | "
+                       f"Sup: {stock_data['Pivot_Support_1']} | Res: {stock_data['Pivot_Resistance_1']}")
             
         except Exception as e:
             error_msg = f"Error: {e}"
@@ -196,7 +200,7 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
                 'Recent_Support': 'N/A',
                 'Recent_Resistance': 'N/A'
             }
-            print(f"  {i}/{total_tickers} {ticker}: {error_msg}")
+            logger.warning(f"{i}/{total_tickers} {ticker}: {error_msg}")
     
     return results
 
@@ -254,12 +258,11 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
         # Write to Excel using openpyxl engine
         df.to_excel(file_path, engine='openpyxl', index=False)
         
-        print(f"\n✓ Results written to {file_path}")
+        logger.info(f"Results written to {file_path}")
         
-        # Print summary for user
-        print("\n" + "="*70)
-        print("         STOCK DATA SUMMARY")
-        print("="*70)
+        # Log summary for user
+        logger.info("STOCK DATA SUMMARY")
+        logger.info("=" * 70)
         
         for _, row in df.iterrows():
             ticker = row['Ticker']
@@ -274,50 +277,49 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
             recent_res = row['Recent_Resistance']
             
             if isinstance(price, (int, float)):
-                print(f"{ticker:>8}: ${safe_format_price(price)} | "
-                      f"52w: ${safe_format_number(high_52w, '>8.2f')}-${safe_format_number(low_52w, '>8.2f')} | "
-                      f"Cap: {safe_format_number(market_cap, '>12.0f')} | "
-                      f"P/E: {safe_format_number(pe_ratio, '>6.2f')}")
-                print(f"{'':>8}  Pivot S/R: {safe_format_number(pivot_sup1, '.2f')}-{safe_format_number(pivot_res1, '.2f')} | "
-                      f"Recent S/R: {safe_format_number(recent_sup, '.2f')}-{safe_format_number(recent_res, '.2f')}")
+                logger.info(f"{ticker:>8}: ${safe_format_price(price)} | "
+                           f"52w: ${safe_format_number(high_52w, '>8.2f')}-${safe_format_number(low_52w, '>8.2f')} | "
+                           f"Cap: {safe_format_number(market_cap, '>12.0f')} | "
+                           f"P/E: {safe_format_number(pe_ratio, '>6.2f')}")
+                logger.info(f"{'':>8}  Pivot S/R: {safe_format_number(pivot_sup1, '.2f')}-{safe_format_number(pivot_res1, '.2f')} | "
+                           f"Recent S/R: {safe_format_number(recent_sup, '.2f')}-{safe_format_number(recent_res, '.2f')}")
             else:
-                print(f"{ticker:>8}: {str(price):>12} | Data: N/A")
+                logger.info(f"{ticker:>8}: {str(price):>12} | Data: N/A")
         
-        print("="*70)
+        logger.info("=" * 70)
         
     except Exception as e:
-        print(f"✗ Error writing results to Excel: {e}")
-        # Fall back to printing results
-        print("\n" + "="*50)
-        print("         STOCK DATA (Excel write failed)")
-        print("="*50)
+        logger.error(f"Error writing results to Excel: {e}")
+        # Fall back to logging results
+        logger.info("STOCK DATA (Excel write failed)")
+        logger.info("=" * 50)
         for ticker, data in results.items():
-            print(f"{ticker}: {data}")
-        print("="*50)
+            logger.info(f"{ticker}: {data}")
+        logger.info("=" * 50)
 
 
 def main():
     """Main function to orchestrate the stock price fetching process"""
-    print("🚀 Stock Data Fetcher - Robinhood Edition")
-    print("="*50)
+    logger.info("🚀 Stock Data Fetcher - Robinhood Edition")
+    logger.info("=" * 50)
     
     # Check if credentials are set
     if USERNAME == "your_email" or PASSWORD == "your_password":
-        print("⚠️  Warning: Please set your Robinhood credentials!")
-        print("   Set ROBINHOOD_USERNAME and ROBINHOOD_PASSWORD environment variables")
-        print("   or modify the USERNAME and PASSWORD variables in this script.")
-        print("\nExample:")
-        print("   export ROBINHOOD_USERNAME=your_email@example.com")
-        print("   export ROBINHOOD_PASSWORD=your_password")
+        logger.warning("Please set your Robinhood credentials!")
+        logger.warning("Set ROBINHOOD_USERNAME and ROBINHOOD_PASSWORD environment variables")
+        logger.warning("or modify the USERNAME and PASSWORD variables in this script.")
+        logger.info("Example:")
+        logger.info("   export ROBINHOOD_USERNAME=your_email@example.com")
+        logger.info("   export ROBINHOOD_PASSWORD=your_password")
         return
     
     # Step 1: Login to Robinhood
-    print(f"\n🔐 Logging into Robinhood as {USERNAME}...")
+    logger.info(f"🔐 Logging into Robinhood as {USERNAME}...")
     if not login_to_robinhood(USERNAME, PASSWORD):
         return
     
     # Step 2: Load Excel tickers
-    print(f"\n📊 Loading tickers from {TICKERS_FILE}...")
+    logger.info(f"📊 Loading tickers from {TICKERS_FILE}...")
     tickers = load_tickers_from_excel(TICKERS_FILE)
     if not tickers:
         return
@@ -331,9 +333,9 @@ def main():
     # Logout
     try:
         r.logout()
-        print("\n✓ Logged out of Robinhood")
+        logger.info("Logged out of Robinhood")
     except Exception as e:
-        print(f"\n⚠️  Logout warning: {e}")
+        logger.warning(f"Logout warning: {e}")
 
 
 if __name__ == "__main__":
