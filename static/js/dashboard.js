@@ -180,6 +180,7 @@ async function loadStockData() {
 function updateStockDataTable(data) {
     const tbody = document.getElementById('stock-data-tbody');
     const totalTickers = document.getElementById('total-tickers');
+    const downloadBtn = document.getElementById('download-excel-btn');
     
     if (!data || !data.stocks || data.stocks.length === 0) {
         tbody.innerHTML = `
@@ -190,10 +191,19 @@ function updateStockDataTable(data) {
             </tr>
         `;
         totalTickers.textContent = '0';
+        // Hide download button when no data
+        if (downloadBtn) {
+            downloadBtn.style.display = 'none';
+        }
         return;
     }
     
     totalTickers.textContent = data.stocks.length;
+    
+    // Show download button when data is available
+    if (downloadBtn) {
+        downloadBtn.style.display = 'inline-block';
+    }
     
     tbody.innerHTML = data.stocks.map(stock => `
         <tr>
@@ -304,6 +314,27 @@ async function addTicker() {
     } catch (error) {
         console.error('Error adding ticker:', error);
         showError('Failed to add ticker: ' + error.message);
+    }
+}
+
+// Download Excel file
+async function downloadExcel() {
+    try {
+        showSuccess('Downloading Excel file...');
+        
+        // Create a temporary link element and trigger download
+        const link = document.createElement('a');
+        link.href = '/download-excel';
+        link.download = ''; // Let the server set the filename
+        
+        // Append to body, click, and remove
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+    } catch (error) {
+        console.error('Error downloading Excel file:', error);
+        showError('Failed to download Excel file: ' + error.message);
     }
 }
 
