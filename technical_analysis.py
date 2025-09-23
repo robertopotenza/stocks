@@ -191,6 +191,7 @@ def calculate_technical_levels(ticker: str) -> Dict[str, Any]:
         historical_data = get_historical_data(ticker, interval='day', span='3month')
         
         if not historical_data or len(historical_data) < 5:
+            logger.warning(f"Insufficient historical data for {ticker}: {len(historical_data) if historical_data else 0} data points")
             return {
                 'pivot_support_1': 'N/A',
                 'pivot_support_2': 'N/A', 
@@ -207,20 +208,21 @@ def calculate_technical_levels(ticker: str) -> Dict[str, Any]:
         # Calculate recent support/resistance
         recent_levels = find_recent_support_resistance(historical_data, lookback_days=20)
         
-        # Combine results
+        # Combine results with defensive checks
         result = {
-            'pivot_support_1': pivot_levels.get('support_1', 'N/A'),
-            'pivot_support_2': pivot_levels.get('support_2', 'N/A'),
-            'pivot_resistance_1': pivot_levels.get('resistance_1', 'N/A'), 
-            'pivot_resistance_2': pivot_levels.get('resistance_2', 'N/A'),
-            'recent_support': recent_levels.get('recent_support_1', 'N/A'),
-            'recent_resistance': recent_levels.get('recent_resistance_1', 'N/A'),
+            'pivot_support_1': pivot_levels.get('support_1', 'N/A') if isinstance(pivot_levels, dict) else 'N/A',
+            'pivot_support_2': pivot_levels.get('support_2', 'N/A') if isinstance(pivot_levels, dict) else 'N/A',
+            'pivot_resistance_1': pivot_levels.get('resistance_1', 'N/A') if isinstance(pivot_levels, dict) else 'N/A',
+            'pivot_resistance_2': pivot_levels.get('resistance_2', 'N/A') if isinstance(pivot_levels, dict) else 'N/A',
+            'recent_support': recent_levels.get('recent_support_1', 'N/A') if isinstance(recent_levels, dict) else 'N/A',
+            'recent_resistance': recent_levels.get('recent_resistance_1', 'N/A') if isinstance(recent_levels, dict) else 'N/A',
             'data_points': len(historical_data)
         }
         
         return result
         
     except Exception as e:
+        logger.error(f"Error calculating technical levels for {ticker}: {e}")
         return {
             'pivot_support_1': 'N/A',
             'pivot_support_2': 'N/A',

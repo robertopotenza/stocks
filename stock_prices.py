@@ -148,49 +148,71 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
         try:
             # Get current price from quotes
             quote_data = r.stocks.get_quotes(ticker)
-            if quote_data and len(quote_data) > 0:
-                price = quote_data[0].get('last_trade_price')
-                if price:
-                    stock_data['Price'] = float(price)
+            if quote_data and isinstance(quote_data, list) and len(quote_data) > 0:
+                quote_item = quote_data[0]
+                if isinstance(quote_item, dict):
+                    price = quote_item.get('last_trade_price')
+                    if price:
+                        stock_data['Price'] = float(price)
+                else:
+                    logger.warning(f"{i}/{total_tickers} {ticker}: Quote data item is not a dict, got {type(quote_item)}")
+            elif quote_data is None:
+                logger.warning(f"{i}/{total_tickers} {ticker}: No quote data returned (likely invalid ticker)")
+            elif isinstance(quote_data, list) and len(quote_data) == 0:
+                logger.warning(f"{i}/{total_tickers} {ticker}: Empty quote data list returned (likely invalid ticker)")
+            else:
+                logger.warning(f"{i}/{total_tickers} {ticker}: Unexpected quote data format: {type(quote_data)}")
             
             # Get fundamentals data
             fundamental_data = r.stocks.get_fundamentals(ticker)
-            if fundamental_data and len(fundamental_data) > 0:
+            if fundamental_data and isinstance(fundamental_data, list) and len(fundamental_data) > 0:
                 fund = fundamental_data[0]
-                
-                # 52-week high
-                high_52w = fund.get('high_52_weeks')
-                if high_52w:
-                    stock_data['52w_High'] = float(high_52w)
-                
-                # 52-week low
-                low_52w = fund.get('low_52_weeks')
-                if low_52w:
-                    stock_data['52w_Low'] = float(low_52w)
-                
-                # Market cap
-                market_cap = fund.get('market_cap')
-                if market_cap:
-                    stock_data['MarketCap'] = float(market_cap)
-                
-                # P/E ratio
-                pe_ratio = fund.get('pe_ratio')
-                if pe_ratio:
-                    stock_data['PE_Ratio'] = float(pe_ratio)
+                if isinstance(fund, dict):
+                    # 52-week high
+                    high_52w = fund.get('high_52_weeks')
+                    if high_52w:
+                        stock_data['52w_High'] = float(high_52w)
+                    
+                    # 52-week low
+                    low_52w = fund.get('low_52_weeks')
+                    if low_52w:
+                        stock_data['52w_Low'] = float(low_52w)
+                    
+                    # Market cap
+                    market_cap = fund.get('market_cap')
+                    if market_cap:
+                        stock_data['MarketCap'] = float(market_cap)
+                    
+                    # P/E ratio
+                    pe_ratio = fund.get('pe_ratio')
+                    if pe_ratio:
+                        stock_data['PE_Ratio'] = float(pe_ratio)
+                else:
+                    logger.warning(f"{i}/{total_tickers} {ticker}: Fundamental data item is not a dict, got {type(fund)}")
+            elif fundamental_data is None:
+                logger.warning(f"{i}/{total_tickers} {ticker}: No fundamental data returned (likely invalid ticker)")
+            elif isinstance(fundamental_data, list) and len(fundamental_data) == 0:
+                logger.warning(f"{i}/{total_tickers} {ticker}: Empty fundamental data list returned (likely invalid ticker)")
+            else:
+                logger.warning(f"{i}/{total_tickers} {ticker}: Unexpected fundamental data format: {type(fundamental_data)}")
             
             # Calculate technical levels (Support & Resistance)
             logger.debug(f"{i}/{total_tickers} {ticker}: Calculating technical levels...")
             technical_levels = calculate_technical_levels(ticker)
             
-            # Add technical analysis results
-            stock_data.update({
-                'Pivot_Support_1': technical_levels.get('pivot_support_1', 'N/A'),
-                'Pivot_Support_2': technical_levels.get('pivot_support_2', 'N/A'),
-                'Pivot_Resistance_1': technical_levels.get('pivot_resistance_1', 'N/A'),
-                'Pivot_Resistance_2': technical_levels.get('pivot_resistance_2', 'N/A'),
-                'Recent_Support': technical_levels.get('recent_support', 'N/A'),
-                'Recent_Resistance': technical_levels.get('recent_resistance', 'N/A')
-            })
+            # Add technical analysis results with defensive checks
+            if technical_levels and isinstance(technical_levels, dict):
+                stock_data.update({
+                    'Pivot_Support_1': technical_levels.get('pivot_support_1', 'N/A'),
+                    'Pivot_Support_2': technical_levels.get('pivot_support_2', 'N/A'),
+                    'Pivot_Resistance_1': technical_levels.get('pivot_resistance_1', 'N/A'),
+                    'Pivot_Resistance_2': technical_levels.get('pivot_resistance_2', 'N/A'),
+                    'Recent_Support': technical_levels.get('recent_support', 'N/A'),
+                    'Recent_Resistance': technical_levels.get('recent_resistance', 'N/A')
+                })
+            else:
+                logger.warning(f"{i}/{total_tickers} {ticker}: Technical levels calculation returned invalid data: {type(technical_levels)}")
+                # Keep default 'N/A' values already set in stock_data
             
             results[ticker] = stock_data
             logger.info(f"{i}/{total_tickers} {ticker}: ${stock_data['Price']} | "
