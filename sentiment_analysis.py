@@ -237,6 +237,13 @@ class RedditSentimentFetcher:
         
         overall_score = (positive * 0.6 - negative * 0.6) / total_mentions if total_mentions > 0 else 0
         
+        # Calculate sentiment percentages
+        pos_pct = round((positive / total_mentions) * 100, 1) if total_mentions > 0 else 0
+        neg_pct = round((negative / total_mentions) * 100, 1) if total_mentions > 0 else 0
+        
+        # Calculate standardized sentiment score: ((% Positive - % Negative) + 100) / 2
+        standardized_sentiment_score = ((pos_pct - neg_pct) + 100) / 2
+        
         return {
             'ticker': ticker,
             'source': 'reddit',
@@ -247,11 +254,12 @@ class RedditSentimentFetcher:
                 'negative': negative
             },
             'sentiment_percentages': {
-                'positive': round((positive / total_mentions) * 100, 1) if total_mentions > 0 else 0,
+                'positive': pos_pct,
                 'neutral': round((neutral / total_mentions) * 100, 1) if total_mentions > 0 else 0,
-                'negative': round((negative / total_mentions) * 100, 1) if total_mentions > 0 else 0
+                'negative': neg_pct
             },
             'overall_score': round(overall_score, 3),
+            'standardized_sentiment_score': round(standardized_sentiment_score, 1),
             'trend_direction': 'improving' if overall_score > 0.1 else 'declining' if overall_score < -0.1 else 'stable',
             'posts_analyzed': [
                 {'text': f'Demo post about {ticker}', 'sentiment': 'positive', 'score': 0.5, 'weight': 3},
@@ -466,6 +474,13 @@ class TwitterSentimentFetcher:
         
         overall_score = (positive * 0.5 - negative * 0.5) / total_mentions if total_mentions > 0 else 0
         
+        # Calculate sentiment percentages
+        pos_pct = round((positive / total_mentions) * 100, 1) if total_mentions > 0 else 0
+        neg_pct = round((negative / total_mentions) * 100, 1) if total_mentions > 0 else 0
+        
+        # Calculate standardized sentiment score: ((% Positive - % Negative) + 100) / 2
+        standardized_sentiment_score = ((pos_pct - neg_pct) + 100) / 2
+        
         return {
             'ticker': ticker,
             'source': 'twitter',
@@ -476,11 +491,12 @@ class TwitterSentimentFetcher:
                 'negative': negative
             },
             'sentiment_percentages': {
-                'positive': round((positive / total_mentions) * 100, 1) if total_mentions > 0 else 0,
+                'positive': pos_pct,
                 'neutral': round((neutral / total_mentions) * 100, 1) if total_mentions > 0 else 0,
-                'negative': round((negative / total_mentions) * 100, 1) if total_mentions > 0 else 0
+                'negative': neg_pct
             },
             'overall_score': round(overall_score, 3),
+            'standardized_sentiment_score': round(standardized_sentiment_score, 1),
             'trend_direction': 'improving' if overall_score > 0.1 else 'declining' if overall_score < -0.1 else 'stable',
             'posts_analyzed': [
                 {'text': f'Demo tweet about {ticker} performance', 'sentiment': 'positive', 'score': 0.4, 'weight': 5},
@@ -633,12 +649,17 @@ class SocialMediaSentimentAnalyzer:
         else:
             trend_direction = 'stable'
         
+        # Calculate standardized sentiment score using new formula
+        # Sentiment Score = ((% Positive - % Negative) + 100) / 2
+        standardized_sentiment_score = ((combined_percentages['positive'] - combined_percentages['negative']) + 100) / 2
+
         return {
             'ticker': ticker,
             'total_mentions': total_mentions,
             'sentiment_breakdown': combined_breakdown,
             'sentiment_percentages': combined_percentages,
-            'overall_sentiment_score': round(combined_score, 3),
+            'overall_sentiment_score': round(combined_score, 3),  # Keep original for compatibility
+            'standardized_sentiment_score': round(standardized_sentiment_score, 1),  # New standardized score
             'trend_direction': trend_direction,
             'platform_data': {
                 'reddit': reddit_data,
@@ -655,6 +676,7 @@ class SocialMediaSentimentAnalyzer:
             'sentiment_breakdown': {'positive': 0, 'neutral': 0, 'negative': 0},
             'sentiment_percentages': {'positive': 0.0, 'neutral': 0.0, 'negative': 0.0},
             'overall_sentiment_score': 0.0,
+            'standardized_sentiment_score': 50.0,  # Neutral sentiment = 50 on 0-100 scale
             'trend_direction': 'stable',
             'platform_data': {
                 'reddit': {'total_mentions': 0, 'overall_score': 0.0},

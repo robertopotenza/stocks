@@ -414,14 +414,16 @@ class StockEvaluator:
             return f"{ticker} has limited data for comprehensive analysis."
     
     def _get_recommendation(self, total_score: float) -> str:
-        """Get recommendation based on total score."""
-        if total_score >= 75:
+        """Get recommendation based on standardized total score thresholds."""
+        # Standardized recommendation tiers:
+        # Strong Buy ≥ 70, Buy 60-69, Hold 50-59, Weak Hold 40-49, Avoid < 40
+        if total_score >= 70:
             return "Strong Buy"
         elif total_score >= 60:
             return "Buy"
-        elif total_score >= 45:
+        elif total_score >= 50:
             return "Hold"
-        elif total_score >= 30:
+        elif total_score >= 40:
             return "Weak Hold"
         else:
             return "Avoid"

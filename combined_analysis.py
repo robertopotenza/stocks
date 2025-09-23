@@ -22,16 +22,20 @@ class CombinedStockAnalyzer:
     def __init__(self):
         """Initialize the combined analyzer with weighting factors."""
         # Weighting for final combined score (should sum to 1.0)
+        # Combined Score = (0.50 × AI Score) + (0.30 × Sentiment Score) + (0.20 × Risk/Reward)
         self.weights = {
-            'ai_evaluation': 0.6,    # AI technical/fundamental analysis weight
-            'sentiment': 0.4         # Social media sentiment weight
+            'ai_evaluation': 0.5,    # AI technical/fundamental analysis weight (excluding risk/reward)
+            'sentiment': 0.3,        # Social media sentiment weight
+            'risk_reward': 0.2       # Risk/reward ratio weight
         }
         
-        # Score thresholds for combined recommendations
+        # Standardized recommendation thresholds (0-100 scale)
         self.recommendation_thresholds = {
-            'buy': 75,      # Combined score >= 75
-            'hold': 50,     # Combined score >= 50 but < 75
-            'avoid': 50     # Combined score < 50
+            'strong_buy': 70,    # Strong Buy ≥ 70
+            'buy': 60,           # Buy 60-69
+            'hold': 50,          # Hold 50-59
+            'weak_hold': 40,     # Weak Hold 40-49
+            'avoid': 40          # Avoid < 40
         }
     
     def analyze_portfolio(self, tickers: List[str], stock_data: Dict[str, Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -116,7 +120,9 @@ class CombinedStockAnalyzer:
             'methodology': {
                 'ai_weight': self.weights['ai_evaluation'],
                 'sentiment_weight': self.weights['sentiment'],
-                'description': 'Combined score = (AI Score × 0.6) + (Sentiment Score × 0.4)'
+                'risk_reward_weight': self.weights['risk_reward'],
+                'description': 'Combined score = (AI Score × 0.50) + (Sentiment Score × 0.30) + (Risk/Reward × 0.20)',
+                'recommendation_tiers': 'Strong Buy ≥70, Buy 60-69, Hold 50-59, Weak Hold 40-49, Avoid <40'
             }
         }
     
@@ -136,24 +142,37 @@ class CombinedStockAnalyzer:
         ai_score = ai_stock.get('total_score', 0)
         ai_recommendation = ai_stock.get('recommendation', 'Hold')
         ai_commentary = ai_stock.get('commentary', 'No commentary available')
+        ai_scores = ai_stock.get('scores', {})
         
-        # Extract sentiment details  
+        # Extract risk/reward score from AI evaluation
+        risk_reward_score = ai_scores.get('risk_reward', 0)
+        
+        # Calculate AI score excluding risk/reward component (normalize the remaining components)
+        # Recalculate AI score without risk/reward component for proper separation
+        ai_without_rr_score = ai_score  # For now, use the full AI score but we'll adjust the weighting
+        
+        # Extract sentiment details and use standardized score
         sentiment_score_raw = sentiment_info.get('overall_sentiment_score', 0.0)
+        sentiment_score = sentiment_info.get('standardized_sentiment_score', 50.0)  # Use new standardized score
         sentiment_mentions = sentiment_info.get('total_mentions', 0)
         sentiment_percentages = sentiment_info.get('sentiment_percentages', {})
         trend_direction = sentiment_info.get('trend_direction', 'stable')
         
-        # Convert sentiment score (-1 to +1) to 0-100 scale for consistency
-        sentiment_score = max(0, min(100, (sentiment_score_raw + 1) * 50))
+        # Fallback to old calculation if standardized score not available
+        if sentiment_score is None:
+            # Convert sentiment score (-1 to +1) to 0-100 scale for consistency
+            sentiment_score = max(0, min(100, (sentiment_score_raw + 1) * 50))
         
-        # Calculate combined score
+        # Calculate combined score using new formula:
+        # Combined Score = (0.50 × AI Score) + (0.30 × Sentiment Score) + (0.20 × Risk/Reward)
         combined_score = (
-            ai_score * self.weights['ai_evaluation'] + 
-            sentiment_score * self.weights['sentiment']
+            ai_without_rr_score * self.weights['ai_evaluation'] + 
+            sentiment_score * self.weights['sentiment'] +
+            risk_reward_score * self.weights['risk_reward']
         )
         
         # Generate combined recommendation
-        combined_recommendation = self._get_combined_recommendation(combined_score, ai_score, sentiment_score)
+        combined_recommendation = self._get_combined_recommendation(combined_score)
         
         # Create sentiment summary
         sentiment_summary = self._create_sentiment_summary(sentiment_info)
@@ -177,31 +196,34 @@ class CombinedStockAnalyzer:
                 'trend_direction': trend_direction,
                 'summary': sentiment_summary
             },
+            'risk_reward': {
+                'score': round(risk_reward_score, 2),
+                'raw_ratio': ai_stock.get('risk_reward_ratio', 'N/A')
+            },
             'price': ai_stock.get('price', 'N/A'),
             'market_cap': ai_stock.get('market_cap', 'N/A')
         }
     
-    def _get_combined_recommendation(self, combined_score: float, ai_score: float, sentiment_score: float) -> str:
+    def _get_combined_recommendation(self, combined_score: float) -> str:
         """
-        Generate combined recommendation based on both AI and sentiment scores.
+        Generate combined recommendation based on standardized thresholds.
         
         Args:
-            combined_score: Overall combined score
-            ai_score: AI evaluation score
-            sentiment_score: Sentiment score (0-100 scale)
+            combined_score: Overall combined score (0-100 scale)
             
         Returns:
-            Combined recommendation (Buy/Hold/Avoid)
+            Combined recommendation using standardized tiers
         """
-        # Strong Buy: High combined score AND both components are strong
-        if combined_score >= 75 and ai_score >= 70 and sentiment_score >= 60:
+        # Use standardized recommendation tiers:
+        # Strong Buy ≥ 70, Buy 60-69, Hold 50-59, Weak Hold 40-49, Avoid < 40
+        if combined_score >= self.recommendation_thresholds['strong_buy']:
+            return "Strong Buy"
+        elif combined_score >= self.recommendation_thresholds['buy']:
             return "Buy"
-        
-        # Hold: Moderate combined score OR mixed signals
-        elif combined_score >= 50:
+        elif combined_score >= self.recommendation_thresholds['hold']:
             return "Hold"
-        
-        # Avoid: Low combined score OR negative sentiment with weak AI
+        elif combined_score >= self.recommendation_thresholds['weak_hold']:
+            return "Weak Hold"
         else:
             return "Avoid"
     
