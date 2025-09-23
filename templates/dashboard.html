@@ -155,6 +155,9 @@
                             <i class="fas fa-robot me-2"></i>AI Stock Evaluation
                         </h5>
                         <div>
+                            <button class="btn btn-sm btn-outline-success me-2" onclick="runDemoEvaluation()">
+                                <i class="fas fa-play"></i> Demo
+                            </button>
                             <button class="btn btn-sm btn-outline-info me-2" onclick="runQuickEvaluation()">
                                 <i class="fas fa-zap"></i> Quick Eval
                             </button>
@@ -238,8 +241,14 @@
                         
                         <div id="ai-evaluation-placeholder" class="text-center text-muted py-4">
                             <i class="fas fa-robot fa-3x mb-3"></i>
-                            <p>Click "Run AI Analysis" to get intelligent stock recommendations based on technical analysis, valuation metrics, and risk-reward ratios.</p>
-                            <p class="small">The AI will rank stocks from most to least attractive and provide plain English explanations.</p>
+                            <p>Click "Demo" to see sample AI analysis, or "Run AI Analysis" to analyze your current stock data.</p>
+                            <p class="small">The AI evaluates stocks based on technical analysis, valuation metrics, and risk-reward ratios, then ranks them from most to least attractive with plain English explanations.</p>
+                        </div>
+                        
+                        <!-- AI Results Display -->
+                        <div id="ai-results" class="mt-4" style="display: none;">
+                            <h6><i class="fas fa-robot me-2"></i>AI Analysis Results</h6>
+                            <div id="ai-results-content"></div>
                         </div>
                     </div>
                 </div>

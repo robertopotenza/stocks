@@ -535,6 +535,50 @@ async function runQuickEvaluation() {
     }
 }
 
+// Run demo AI evaluation with sample data
+async function runDemoEvaluation() {
+    const loadingElement = document.getElementById('ai-evaluation-loading');
+    const placeholderElement = document.getElementById('ai-evaluation-placeholder');
+    const summarySection = document.getElementById('ai-summary-section');
+    const rankingsContainer = document.getElementById('ai-rankings-container');
+    
+    try {
+        // Show loading state
+        if (loadingElement) loadingElement.style.display = 'block';
+        if (placeholderElement) placeholderElement.style.display = 'none';
+        if (summarySection) summarySection.style.display = 'none';
+        if (rankingsContainer) rankingsContainer.style.display = 'none';
+        
+        showSuccess('Running demo AI evaluation with sample data...');
+        
+        const response = await fetch('/demo-evaluation');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Display results
+        displayAIEvaluation(data);
+        showSuccess('Demo AI evaluation completed! This shows how the AI analyzes real stock data.');
+        
+    } catch (error) {
+        console.error('Error running demo evaluation:', error);
+        showError('Demo evaluation failed: ' + error.message);
+        
+        // Hide loading and show placeholder
+        if (loadingElement) loadingElement.style.display = 'none';
+        if (placeholderElement) placeholderElement.style.display = 'block';
+        
+    } finally {
+        if (loadingElement) loadingElement.style.display = 'none';
+    }
+}
+
 // Display AI evaluation results
 function displayAIEvaluation(data) {
     const summarySection = document.getElementById('ai-summary-section');
@@ -542,32 +586,43 @@ function displayAIEvaluation(data) {
     const placeholderElement = document.getElementById('ai-evaluation-placeholder');
     
     // Hide placeholder
-    placeholderElement.style.display = 'none';
+    if (placeholderElement) {
+        placeholderElement.style.display = 'none';
+    }
     
     // Update summary counts
-    document.getElementById('strong-buys-count').textContent = data.summary.strong_buys || 0;
-    document.getElementById('buys-count').textContent = data.summary.buys || 0;
-    document.getElementById('holds-count').textContent = data.summary.holds || 0;
-    document.getElementById('avoids-count').textContent = (data.summary.avoids || 0) + (data.summary.weak_holds || 0);
+    const strongBuysCount = document.getElementById('strong-buys-count');
+    const buysCount = document.getElementById('buys-count');
+    const holdsCount = document.getElementById('holds-count');
+    const avoidsCount = document.getElementById('avoids-count');
+    
+    if (strongBuysCount) strongBuysCount.textContent = data.summary.strong_buys || 0;
+    if (buysCount) buysCount.textContent = data.summary.buys || 0;
+    if (holdsCount) holdsCount.textContent = data.summary.holds || 0;
+    if (avoidsCount) avoidsCount.textContent = (data.summary.avoids || 0) + (data.summary.weak_holds || 0);
     
     // Update top pick
     const topPickInfo = document.getElementById('top-pick-info');
-    if (data.summary.top_pick && data.ranked_stocks.length > 0) {
-        const topStock = data.ranked_stocks[0];
-        topPickInfo.innerHTML = `
-            <strong>${topStock.ticker}</strong> with score ${topStock.total_score}/100 
-            (${topStock.recommendation}) - ${topStock.commentary}
-        `;
-    } else {
-        topPickInfo.textContent = 'No stocks available for evaluation';
+    if (topPickInfo) {
+        if (data.summary.top_pick && data.ranked_stocks.length > 0) {
+            const topStock = data.ranked_stocks[0];
+            topPickInfo.innerHTML = `
+                <strong>${topStock.ticker}</strong> with score ${topStock.total_score}/100 
+                (${topStock.recommendation}) - ${topStock.commentary}
+            `;
+        } else {
+            topPickInfo.textContent = 'No stocks available for evaluation';
+        }
     }
     
     // Show summary section
-    summarySection.style.display = 'block';
+    if (summarySection) {
+        summarySection.style.display = 'block';
+    }
     
     // Populate rankings table
     const tbody = document.getElementById('ai-rankings-tbody');
-    if (data.ranked_stocks && data.ranked_stocks.length > 0) {
+    if (tbody && data.ranked_stocks && data.ranked_stocks.length > 0) {
         tbody.innerHTML = data.ranked_stocks.map((stock, index) => `
             <tr class="${getRecommendationRowClass(stock.recommendation)}">
                 <td class="fw-bold">${index + 1}</td>
@@ -594,10 +649,10 @@ function displayAIEvaluation(data) {
         `).join('');
         
         // Show rankings container
-        rankingsContainer.style.display = 'block';
-    } else {
+        if (rankingsContainer) rankingsContainer.style.display = 'block';
+    } else if (tbody) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No stocks to display</td></tr>';
-        rankingsContainer.style.display = 'block';
+        if (rankingsContainer) rankingsContainer.style.display = 'block';
     }
 }
 

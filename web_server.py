@@ -342,6 +342,155 @@ def get_quick_evaluation():
         logger.error(f"Error in quick evaluation: {e}")
         return jsonify({'error': f'Failed to perform quick evaluation: {str(e)}'}), 500
 
+@app.route('/demo-evaluation')
+def get_demo_evaluation():
+    """Get a demo AI evaluation using sample data for testing."""
+    logger.debug("Demo evaluation endpoint accessed")
+    
+    try:
+        # Create sample stock data for demonstration
+        sample_data = {
+            'AAPL': {
+                'Price': 175.25,
+                '52w_High': 199.62,
+                '52w_Low': 124.17,
+                'MarketCap': 2750000000000,
+                'PE_Ratio': 28.5,
+                'Pivot_Support_1': 172.50,
+                'Pivot_Support_2': 168.75,
+                'Pivot_Resistance_1': 178.40,
+                'Pivot_Resistance_2': 182.15,
+                'Recent_Support': 170.25,
+                'Recent_Resistance': 180.60,
+                'Risk_Reward_Ratio': 2.3,
+                'Distance_from_52w_High_Pct': 12.2,
+                'Distance_from_52w_Low_Pct': 41.1,
+                'Upside_Potential_Pct': 18.5,
+                'Downside_Risk_Pct': 8.2,
+                'Valuation_Flag': 'Fair Value',
+                'Entry_Opportunity_Flag': 'Favorable',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'GOOGL': {
+                'Price': 2785.50,
+                '52w_High': 3030.93,
+                '52w_Low': 2193.62,
+                'MarketCap': 1850000000000,
+                'PE_Ratio': 24.8,
+                'Pivot_Support_1': 2750.25,
+                'Pivot_Support_2': 2690.80,
+                'Pivot_Resistance_1': 2820.75,
+                'Pivot_Resistance_2': 2880.40,
+                'Recent_Support': 2765.30,
+                'Recent_Resistance': 2810.90,
+                'Risk_Reward_Ratio': 1.8,
+                'Distance_from_52w_High_Pct': 8.1,
+                'Distance_from_52w_Low_Pct': 27.0,
+                'Upside_Potential_Pct': 12.8,
+                'Downside_Risk_Pct': 7.1,
+                'Valuation_Flag': 'Fair Value',
+                'Entry_Opportunity_Flag': 'Neutral',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'TSLA': {
+                'Price': 245.80,
+                '52w_High': 299.29,
+                '52w_Low': 138.80,
+                'MarketCap': 780000000000,
+                'PE_Ratio': 65.2,
+                'Pivot_Support_1': 235.60,
+                'Pivot_Support_2': 220.45,
+                'Pivot_Resistance_1': 260.25,
+                'Pivot_Resistance_2': 275.80,
+                'Recent_Support': 240.15,
+                'Recent_Resistance': 255.70,
+                'Risk_Reward_Ratio': 1.2,
+                'Distance_from_52w_High_Pct': 17.9,
+                'Distance_from_52w_Low_Pct': 77.1,
+                'Upside_Potential_Pct': 9.5,
+                'Downside_Risk_Pct': 8.1,
+                'Valuation_Flag': 'Overvalued',
+                'Entry_Opportunity_Flag': 'Unfavorable',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'NVDA': {
+                'Price': 118.75,
+                '52w_High': 140.76,
+                '52w_Low': 39.23,
+                'MarketCap': 2920000000000,
+                'PE_Ratio': 32.8,
+                'Pivot_Support_1': 115.20,
+                'Pivot_Support_2': 108.45,
+                'Pivot_Resistance_1': 125.30,
+                'Pivot_Resistance_2': 132.85,
+                'Recent_Support': 112.60,
+                'Recent_Resistance': 128.90,
+                'Risk_Reward_Ratio': 3.1,
+                'Distance_from_52w_High_Pct': 15.6,
+                'Distance_from_52w_Low_Pct': 202.6,
+                'Upside_Potential_Pct': 22.4,
+                'Downside_Risk_Pct': 7.2,
+                'Valuation_Flag': 'Overvalued',
+                'Entry_Opportunity_Flag': 'Favorable',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'MSFT': {
+                'Price': 415.30,
+                '52w_High': 468.35,
+                '52w_Low': 309.45,
+                'MarketCap': 3080000000000,
+                'PE_Ratio': 34.2,
+                'Pivot_Support_1': 405.85,
+                'Pivot_Support_2': 395.20,
+                'Pivot_Resistance_1': 425.75,
+                'Pivot_Resistance_2': 435.80,
+                'Recent_Support': 408.90,
+                'Recent_Resistance': 422.15,
+                'Risk_Reward_Ratio': 1.6,
+                'Distance_from_52w_High_Pct': 11.3,
+                'Distance_from_52w_Low_Pct': 34.2,
+                'Upside_Potential_Pct': 8.5,
+                'Downside_Risk_Pct': 5.3,
+                'Valuation_Flag': 'Overvalued',
+                'Entry_Opportunity_Flag': 'Neutral',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'META': {
+                'Price': 485.20,
+                '52w_High': 542.81,
+                '52w_Low': 279.70,
+                'MarketCap': 1240000000000,
+                'PE_Ratio': 22.1,
+                'Pivot_Support_1': 475.40,
+                'Pivot_Support_2': 465.85,
+                'Pivot_Resistance_1': 495.60,
+                'Pivot_Resistance_2': 510.25,
+                'Recent_Support': 478.30,
+                'Recent_Resistance': 492.80,
+                'Risk_Reward_Ratio': 2.8,
+                'Distance_from_52w_High_Pct': 10.6,
+                'Distance_from_52w_Low_Pct': 73.5,
+                'Upside_Potential_Pct': 16.2,
+                'Downside_Risk_Pct': 5.8,
+                'Valuation_Flag': 'Fair Value',
+                'Entry_Opportunity_Flag': 'Favorable',
+                'Price_Level_Flag': 'Mid Range'
+            }
+        }
+        
+        logger.info("Running demo AI evaluation with sample data")
+        
+        # Run AI evaluation on sample data
+        evaluation_result = evaluate_stock_portfolio(sample_data)
+        
+        logger.info(f"Demo AI evaluation completed. Top pick: {evaluation_result['summary'].get('top_pick', 'None')}")
+        
+        return jsonify(evaluation_result)
+        
+    except Exception as e:
+        logger.error(f"Error in demo evaluation: {e}")
+        return jsonify({'error': f'Failed to perform demo evaluation: {str(e)}'}), 500
+
 if __name__ == '__main__':
     # Get port from environment (Railway, Heroku, etc.)
     port = int(os.environ.get('PORT', 5000))
