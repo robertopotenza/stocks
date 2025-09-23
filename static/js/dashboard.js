@@ -717,7 +717,7 @@ function displayStandaloneSentiment(data) {
         if (totalMentions) totalMentions.textContent = summary.total_mentions_across_all_tickers || 0;
         if (mostPositive) mostPositive.textContent = summary.most_positive_ticker || '-';
         if (mostNegative) mostNegative.textContent = summary.most_negative_ticker || '-';
-        if (avgSentiment) avgSentiment.textContent = summary.average_sentiment_score || '0.0';
+        if (avgSentiment) avgSentiment.textContent = summary.average_standardized_sentiment_score || summary.average_sentiment_score || '50.0';
     }
     
     // Populate sentiment table
@@ -725,10 +725,12 @@ function displayStandaloneSentiment(data) {
     if (tbody && data.sentiment_data) {
         const sentimentArray = Object.entries(data.sentiment_data)
             .map(([ticker, sentimentData]) => ({ ticker, ...sentimentData }))
-            .sort((a, b) => (b.overall_sentiment_score || 0) - (a.overall_sentiment_score || 0));
+            .sort((a, b) => (b.standardized_sentiment_score || b.overall_sentiment_score || 0) - (a.standardized_sentiment_score || a.overall_sentiment_score || 0));
         
-        tbody.innerHTML = sentimentArray.map((item, index) => `
-            <tr class="${getSentimentRowClass(item.overall_sentiment_score)}">
+        tbody.innerHTML = sentimentArray.map((item, index) => {
+            const standardizedScore = item.standardized_sentiment_score || ((item.overall_sentiment_score + 1) * 50);
+            return `
+            <tr class="${getSentimentRowClass(standardizedScore)}">
                 <td class="fw-bold">${index + 1}</td>
                 <td class="fw-bold">${item.ticker}</td>
                 <td class="text-center">${item.total_mentions || 0}</td>
@@ -736,8 +738,8 @@ function displayStandaloneSentiment(data) {
                 <td class="text-center">${item.sentiment_percentages?.neutral || 0}%</td>
                 <td class="text-center">${item.sentiment_percentages?.negative || 0}%</td>
                 <td class="text-center">
-                    <span class="badge ${getSentimentBadgeClass(item.overall_sentiment_score)}">
-                        ${(item.overall_sentiment_score || 0).toFixed(3)}
+                    <span class="badge ${getSentimentBadgeClass(standardizedScore)}">
+                        ${standardizedScore.toFixed(1)}
                     </span>
                 </td>
                 <td class="text-center">
@@ -745,8 +747,8 @@ function displayStandaloneSentiment(data) {
                         ${getTrendIcon(item.trend_direction)} ${item.trend_direction || 'stable'}
                     </span>
                 </td>
-            </tr>
-        `).join('');
+            </tr>`;
+        }).join('');
     } else if (tbody) {
         tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No sentiment data available</td></tr>';
     }
@@ -772,25 +774,27 @@ function displaySentimentSummary(sentimentSummary) {
     if (totalMentions) totalMentions.textContent = sentimentSummary.total_mentions_across_portfolio || 0;
     if (mostPositive) mostPositive.textContent = sentimentSummary.most_positive_ticker || '-';
     if (mostNegative) mostNegative.textContent = sentimentSummary.most_negative_ticker || '-';
-    if (avgSentiment) avgSentiment.textContent = sentimentSummary.average_sentiment_score || '0.0';
+    if (avgSentiment) avgSentiment.textContent = sentimentSummary.average_standardized_sentiment_score || sentimentSummary.average_sentiment_score || '50.0';
     
     // Populate sentiment table
     const tbody = document.getElementById('sentiment-rankings-tbody');
     if (tbody && sentimentSummary.sentiment_data) {
         const sentimentArray = Object.entries(sentimentSummary.sentiment_data)
             .map(([ticker, sentimentData]) => ({ ticker, ...sentimentData }))
-            .sort((a, b) => (b.overall_sentiment_score || 0) - (a.overall_sentiment_score || 0));
+            .sort((a, b) => (b.standardized_sentiment_score || b.overall_sentiment_score || 0) - (a.standardized_sentiment_score || a.overall_sentiment_score || 0));
         
-        tbody.innerHTML = sentimentArray.map(item => `
-            <tr class="${getSentimentRowClass(item.overall_sentiment_score)}">
+        tbody.innerHTML = sentimentArray.map(item => {
+            const standardizedScore = item.standardized_sentiment_score || ((item.overall_sentiment_score + 1) * 50);
+            return `
+            <tr class="${getSentimentRowClass(standardizedScore)}">
                 <td class="fw-bold">${item.ticker}</td>
                 <td class="text-center">${item.total_mentions || 0}</td>
                 <td class="text-center">${item.sentiment_percentages?.positive || 0}%</td>
                 <td class="text-center">${item.sentiment_percentages?.neutral || 0}%</td>
                 <td class="text-center">${item.sentiment_percentages?.negative || 0}%</td>
                 <td class="text-center">
-                    <span class="badge ${getSentimentBadgeClass(item.overall_sentiment_score)}">
-                        ${(item.overall_sentiment_score || 0).toFixed(3)}
+                    <span class="badge ${getSentimentBadgeClass(standardizedScore)}">
+                        ${standardizedScore.toFixed(1)}
                     </span>
                 </td>
                 <td class="text-center">
@@ -798,8 +802,8 @@ function displaySentimentSummary(sentimentSummary) {
                         ${getTrendIcon(item.trend_direction)} ${item.trend_direction || 'stable'}
                     </span>
                 </td>
-            </tr>
-        `).join('');
+            </tr>`;
+        }).join('');
     }
     
     // Show sentiment section
@@ -812,33 +816,33 @@ function formatSentiment(sentimentData) {
         return '<small class="text-muted">No data</small>';
     }
     
-    const score = sentimentData.overall_sentiment_score || 0;
+    const score = sentimentData.standardized_sentiment_score || ((sentimentData.overall_sentiment_score + 1) * 50) || 50;
     const mentions = sentimentData.total_mentions || 0;
     const badgeClass = getSentimentBadgeClass(score);
     
     return `
         <div class="text-center">
-            <span class="badge ${badgeClass} mb-1">${score.toFixed(2)}</span>
+            <span class="badge ${badgeClass} mb-1">${score.toFixed(1)}</span>
             <br>
             <small class="text-muted">${mentions} mentions</small>
         </div>
     `;
 }
 
-// Helper functions for sentiment display
+// Helper functions for sentiment display (0-100 scale)
 function getSentimentRowClass(score) {
-    if (score > 0.2) return 'table-success';
-    if (score > 0.05) return 'table-info';
-    if (score < -0.2) return 'table-danger';
-    if (score < -0.05) return 'table-warning';
+    if (score > 70) return 'table-success';
+    if (score > 60) return 'table-info';
+    if (score < 30) return 'table-danger';
+    if (score < 40) return 'table-warning';
     return '';
 }
 
 function getSentimentBadgeClass(score) {
-    if (score > 0.2) return 'bg-success';
-    if (score > 0.05) return 'bg-primary';
-    if (score < -0.2) return 'bg-danger';
-    if (score < -0.05) return 'bg-warning text-dark';
+    if (score > 70) return 'bg-success';
+    if (score > 60) return 'bg-primary';
+    if (score < 30) return 'bg-danger';
+    if (score < 40) return 'bg-warning text-dark';
     return 'bg-secondary';
 }
 
