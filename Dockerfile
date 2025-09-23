@@ -24,6 +24,10 @@ COPY . .
 
 # Create a non-root user for security
 RUN useradd --create-home --shell /bin/bash app
+
+# Change ownership of the app directory to the app user
+RUN chown -R app:app /app
+
 USER app
 
 # Run the application
