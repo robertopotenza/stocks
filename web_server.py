@@ -15,7 +15,8 @@ from datetime import datetime
 from flask import Flask, jsonify, request, render_template, send_file
 import pandas as pd
 from stock_prices import main as run_stock_fetcher, fetch_stock_data, load_tickers_from_excel
-from ai_evaluation import evaluate_stock_portfolio
+from ai_evaluation import evaluate_stock_portfolio, evaluate_stock_portfolio_with_sentiment
+from sentiment_analysis import analyze_portfolio_sentiment
 from logging_config import setup_logging, get_web_logs, clear_web_logs, get_logger
 
 # Setup logging with web capture enabled
@@ -279,11 +280,11 @@ def get_ai_evaluation():
                     data[col] = value
             stock_data[ticker] = data
         
-        # Run AI evaluation
-        logger.info(f"Running AI evaluation on {len(stock_data)} stocks")
-        evaluation_result = evaluate_stock_portfolio(stock_data)
+        # Run enhanced AI evaluation with sentiment analysis
+        logger.info(f"Running enhanced AI evaluation with sentiment analysis on {len(stock_data)} stocks")
+        evaluation_result = evaluate_stock_portfolio_with_sentiment(stock_data, include_sentiment=True)
         
-        logger.info(f"AI evaluation completed. Top pick: {evaluation_result['summary'].get('top_pick', 'None')}")
+        logger.info(f"Enhanced AI evaluation completed. Top pick: {evaluation_result['summary'].get('top_pick', 'None')}")
         
         return jsonify(evaluation_result)
         
@@ -490,6 +491,82 @@ def get_demo_evaluation():
     except Exception as e:
         logger.error(f"Error in demo evaluation: {e}")
         return jsonify({'error': f'Failed to perform demo evaluation: {str(e)}'}), 500
+
+@app.route('/sentiment-analysis')
+def get_sentiment_analysis():
+    """Get social media sentiment analysis for current tickers."""
+    logger.debug("Sentiment analysis endpoint accessed")
+    
+    try:
+        # Load tickers from Excel file
+        if not os.path.exists(TICKERS_FILE):
+            return jsonify({
+                'error': 'No ticker data available. Add some tickers first.'
+            }), 404
+        
+        # Read the Excel file to get tickers
+        df = pd.read_excel(TICKERS_FILE)
+        
+        if 'Ticker' not in df.columns:
+            return jsonify({
+                'error': 'Invalid ticker file format.'
+            }), 400
+        
+        tickers = df['Ticker'].tolist()
+        
+        if not tickers:
+            return jsonify({
+                'error': 'No tickers found in the file.'
+            }), 400
+        
+        # Limit tickers to avoid overwhelming the APIs
+        limited_tickers = tickers[:10]
+        
+        logger.info(f"Running sentiment analysis on {len(limited_tickers)} tickers")
+        
+        # Run sentiment analysis
+        sentiment_result = analyze_portfolio_sentiment(limited_tickers, days=5)
+        
+        logger.info(f"Sentiment analysis completed for {len(sentiment_result.get('tickers_analyzed', []))} tickers")
+        
+        return jsonify(sentiment_result)
+        
+    except Exception as e:
+        logger.error(f"Error in sentiment analysis: {e}")
+        return jsonify({'error': f'Failed to perform sentiment analysis: {str(e)}'}), 500
+
+@app.route('/ticker-sentiment/<ticker>')
+def get_ticker_sentiment(ticker):
+    """Get sentiment analysis for a specific ticker."""
+    logger.debug(f"Ticker sentiment endpoint accessed for {ticker}")
+    
+    try:
+        ticker = ticker.upper()
+        
+        logger.info(f"Running sentiment analysis for {ticker}")
+        
+        # Run sentiment analysis for single ticker
+        sentiment_result = analyze_portfolio_sentiment([ticker], days=5)
+        
+        # Extract data for the specific ticker
+        ticker_data = sentiment_result.get('sentiment_data', {}).get(ticker, {})
+        
+        if not ticker_data:
+            return jsonify({
+                'error': f'No sentiment data found for {ticker}'
+            }), 404
+        
+        logger.info(f"Sentiment analysis completed for {ticker}")
+        
+        return jsonify({
+            'ticker': ticker,
+            'sentiment_data': ticker_data,
+            'portfolio_summary': sentiment_result.get('portfolio_summary', {})
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in ticker sentiment analysis for {ticker}: {e}")
+        return jsonify({'error': f'Failed to get sentiment for {ticker}: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # Get port from environment (Railway, Heroku, etc.)

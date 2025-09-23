@@ -23,11 +23,12 @@ class StockEvaluator:
         """Initialize the stock evaluator with scoring weights."""
         # Scoring weights for different factors (sum should be 1.0)
         self.weights = {
-            'technical_position': 0.30,    # Position relative to support/resistance
-            'valuation': 0.25,             # PE ratio and valuation flags
+            'technical_position': 0.25,    # Position relative to support/resistance
+            'valuation': 0.20,             # PE ratio and valuation flags
             'risk_reward': 0.20,           # Risk/reward ratio
             'momentum': 0.15,              # Distance from 52w high/low
-            'upside_potential': 0.10       # Upside vs downside potential
+            'upside_potential': 0.10,      # Upside vs downside potential
+            'sentiment': 0.10              # Social media sentiment
         }
     
     def evaluate_stocks(self, stock_data: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -78,6 +79,7 @@ class StockEvaluator:
         risk_reward_score = self._score_risk_reward(data)
         momentum_score = self._score_momentum(data)
         upside_score = self._score_upside_potential(data)
+        sentiment_score = self._score_sentiment(data)
         
         # Calculate weighted total score
         total_score = (
@@ -85,7 +87,8 @@ class StockEvaluator:
             valuation_score * self.weights['valuation'] +
             risk_reward_score * self.weights['risk_reward'] +
             momentum_score * self.weights['momentum'] +
-            upside_score * self.weights['upside_potential']
+            upside_score * self.weights['upside_potential'] +
+            sentiment_score * self.weights['sentiment']
         )
         
         # Generate AI commentary
@@ -94,7 +97,8 @@ class StockEvaluator:
             'valuation': valuation_score,
             'risk_reward': risk_reward_score,
             'momentum': momentum_score,
-            'upside': upside_score
+            'upside': upside_score,
+            'sentiment': sentiment_score
         })
         
         # Determine overall recommendation
@@ -110,7 +114,8 @@ class StockEvaluator:
                 'valuation': round(valuation_score, 2),
                 'risk_reward': round(risk_reward_score, 2),
                 'momentum': round(momentum_score, 2),
-                'upside_potential': round(upside_score, 2)
+                'upside_potential': round(upside_score, 2),
+                'sentiment': round(sentiment_score, 2)
             },
             'price': price,
             'pe_ratio': data.get('PE_Ratio', 'N/A'),
@@ -273,6 +278,49 @@ class StockEvaluator:
         
         return max(0, min(100, score))
     
+    def _score_sentiment(self, data: Dict[str, Any]) -> float:
+        """Score based on social media sentiment analysis."""
+        score = 50.0  # Neutral base score
+        
+        sentiment_data = data.get('sentiment_data', {})
+        
+        if not sentiment_data or sentiment_data.get('total_mentions', 0) == 0:
+            # No sentiment data available - return neutral score
+            return score
+        
+        overall_sentiment_score = sentiment_data.get('overall_sentiment_score', 0.0)
+        total_mentions = sentiment_data.get('total_mentions', 0)
+        trend_direction = sentiment_data.get('trend_direction', 'stable')
+        sentiment_percentages = sentiment_data.get('sentiment_percentages', {})
+        
+        # Base sentiment score (compound score from -1 to +1)
+        # Convert to 0-100 scale
+        sentiment_adjustment = overall_sentiment_score * 30  # Scale to max ±30 points
+        score += sentiment_adjustment
+        
+        # Bonus for high volume of mentions (indicates high interest)
+        if total_mentions > 50:
+            score += 10
+        elif total_mentions > 20:
+            score += 5
+        
+        # Trend direction bonus/penalty
+        if trend_direction == 'improving':
+            score += 10
+        elif trend_direction == 'declining':
+            score -= 10
+        
+        # Bonus for overwhelmingly positive sentiment
+        positive_pct = sentiment_percentages.get('positive', 0)
+        negative_pct = sentiment_percentages.get('negative', 0)
+        
+        if positive_pct > 60 and negative_pct < 20:
+            score += 15  # Very positive sentiment
+        elif positive_pct < 20 and negative_pct > 60:
+            score -= 15  # Very negative sentiment
+        
+        return max(0, min(100, score))
+    
     def _generate_commentary(self, ticker: str, data: Dict[str, Any], scores: Dict[str, float]) -> str:
         """Generate AI commentary for the stock."""
         price = data.get('Price')
@@ -322,6 +370,29 @@ class StockEvaluator:
         # Upside potential
         if isinstance(upside_potential, (int, float)) and upside_potential > 10:
             commentary_parts.append(f"{upside_potential:.0f}% upside potential to resistance")
+        
+        # Sentiment analysis
+        sentiment_data = data.get('sentiment_data', {})
+        if sentiment_data and sentiment_data.get('total_mentions', 0) > 0:
+            sentiment_score = sentiment_data.get('overall_sentiment_score', 0)
+            mentions = sentiment_data.get('total_mentions', 0)
+            trend = sentiment_data.get('trend_direction', 'stable')
+            
+            if sentiment_score > 0.2:
+                sentiment_desc = "very positive"
+            elif sentiment_score > 0.05:
+                sentiment_desc = "positive"
+            elif sentiment_score < -0.2:
+                sentiment_desc = "very negative"
+            elif sentiment_score < -0.05:
+                sentiment_desc = "negative"
+            else:
+                sentiment_desc = "neutral"
+            
+            if mentions > 20:
+                commentary_parts.append(f"{sentiment_desc} social media sentiment with {mentions} mentions")
+            elif mentions > 0:
+                commentary_parts.append(f"{sentiment_desc} sentiment from social media")
         
         # Combine commentary
         if commentary_parts:
@@ -397,3 +468,81 @@ def evaluate_stock_portfolio(stock_data: Dict[str, Dict[str, Any]]) -> Dict[str,
         'ranked_stocks': evaluated_stocks,
         'summary': summary
     }
+
+
+def evaluate_stock_portfolio_with_sentiment(stock_data: Dict[str, Dict[str, Any]], 
+                                           include_sentiment: bool = True) -> Dict[str, Any]:
+    """
+    Enhanced function to evaluate a portfolio of stocks with optional sentiment analysis.
+    
+    Args:
+        stock_data: Dictionary mapping ticker to stock data
+        include_sentiment: Whether to include sentiment analysis
+        
+    Returns:
+        Dictionary containing ranked stocks and portfolio summary with sentiment data
+    """
+    from sentiment_analysis import analyze_portfolio_sentiment
+    
+    logger.info("🤖 Starting enhanced AI-powered stock evaluation with sentiment analysis...")
+    
+    # Get list of tickers for sentiment analysis
+    tickers = list(stock_data.keys())
+    
+    # Fetch sentiment data if requested
+    sentiment_results = {}
+    if include_sentiment and tickers:
+        try:
+            logger.info(f"📱 Analyzing social media sentiment for {len(tickers)} tickers...")
+            portfolio_sentiment = analyze_portfolio_sentiment(tickers, days=5)
+            sentiment_results = portfolio_sentiment.get('sentiment_data', {})
+            logger.info(f"✅ Sentiment analysis completed for {len(sentiment_results)} tickers")
+        except Exception as e:
+            logger.warning(f"Failed to fetch sentiment data: {e}")
+            sentiment_results = {}
+    
+    # Integrate sentiment data into stock data
+    enhanced_stock_data = {}
+    for ticker, data in stock_data.items():
+        enhanced_data = data.copy()
+        if ticker in sentiment_results:
+            enhanced_data['sentiment_data'] = sentiment_results[ticker]
+        enhanced_stock_data[ticker] = enhanced_data
+    
+    # Run standard AI evaluation with enhanced data
+    evaluation_result = evaluate_stock_portfolio(enhanced_stock_data)
+    
+    # Add sentiment summary to the result
+    if sentiment_results:
+        # Calculate portfolio sentiment metrics
+        total_mentions = sum(s.get('total_mentions', 0) for s in sentiment_results.values())
+        
+        # Sort by sentiment for most/least positive
+        sentiment_sorted = sorted(
+            [(ticker, data) for ticker, data in sentiment_results.items()],
+            key=lambda x: x[1].get('overall_sentiment_score', 0),
+            reverse=True
+        )
+        
+        most_positive_ticker = sentiment_sorted[0][0] if sentiment_sorted else None
+        most_negative_ticker = sentiment_sorted[-1][0] if sentiment_sorted else None
+        
+        # Calculate average sentiment score weighted by mentions
+        if total_mentions > 0:
+            weighted_sentiment = sum(
+                data.get('overall_sentiment_score', 0) * data.get('total_mentions', 0)
+                for data in sentiment_results.values()
+            ) / total_mentions
+        else:
+            weighted_sentiment = 0.0
+        
+        evaluation_result['sentiment_summary'] = {
+            'total_mentions_across_portfolio': total_mentions,
+            'average_sentiment_score': round(weighted_sentiment, 3),
+            'most_positive_ticker': most_positive_ticker,
+            'most_negative_ticker': most_negative_ticker,
+            'tickers_with_sentiment': len(sentiment_results),
+            'sentiment_data': sentiment_results
+        }
+    
+    return evaluation_result
