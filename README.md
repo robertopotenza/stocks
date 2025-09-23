@@ -174,7 +174,18 @@ The script now includes comprehensive technical analysis to identify support and
 
 ## Railway Deployment
 
-This repository is ready for deployment on Railway. Railway will automatically detect the `Procfile` and deploy this as a Worker service (no HTTP port exposed).
+This repository supports deployment on Railway in two modes:
+
+### Web Service Mode (Default)
+For platforms expecting an HTTP server, the application automatically runs as a web service with the following endpoints:
+- `GET /` - Health check endpoint
+- `GET /run` - Trigger stock data fetching job  
+- `GET /status` - Get current job status
+- `GET /logs` - View last job output
+- `GET /favicon.ico` - Favicon handler
+
+### Worker Service Mode
+For background processing without HTTP endpoints, set `WEB_MODE=false`.
 
 ### Quick Deploy to Railway
 
@@ -188,8 +199,9 @@ This repository is ready for deployment on Railway. Railway will automatically d
 
 2. **Deploy via GitHub Integration**:
    - Connect your GitHub repository to Railway
-   - Railway will automatically detect the `Procfile` and `Dockerfile`
-   - Select "Worker" as the service type during setup
+   - Railway will automatically detect the `Dockerfile`
+   - The service will automatically run as a **Web Service** (recommended)
+   - Or set `WEB_MODE=false` to run as a **Worker Service**
 
 ### Required Environment Variables
 
@@ -199,6 +211,8 @@ Set these environment variables in your Railway project:
 - `ROBINHOOD_PASSWORD`: Your Robinhood password  
 - `ROBINHOOD_MFA`: (Optional) Your MFA code for non-interactive login
 - `TICKERS_FILE`: Set to `tickers.xlsx` if keeping the Excel file in the repository
+- `WEB_MODE`: Set to `false` for worker mode, or `true` (default) for web service mode
+- `PORT`: (Auto-set by Railway) Port for the web service
 
 ### Database Storage (Optional)
 
@@ -211,7 +225,23 @@ If you need persistent storage for the `tickers.xlsx` file:
 ### Railway Configuration Files
 
 - `Dockerfile`: Containerizes the application for Railway
-- `Procfile`: Specifies this as a Worker service (`worker: python stock_prices.py`)
+- `Procfile`: Legacy worker configuration (`worker: python stock_prices.py`) 
+- `main.py`: Auto-detects deployment mode (web service vs worker)
+- `web_server.py`: Flask web server for HTTP endpoints
+- `wsgi.py`: WSGI entry point for production deployment
+
+### Deployment Modes
+
+**Web Service Mode (Recommended)**:
+- Provides HTTP endpoints for health checks and job triggering
+- Automatically uses gunicorn for production deployment
+- Fixes 502 Bad Gateway errors on platforms expecting HTTP services
+- Default when `WEB_MODE` is not set or set to `true`
+
+**Worker Service Mode**:
+- Runs the stock fetching script once and exits
+- Set `WEB_MODE=false` for this mode
+- Suitable for scheduled jobs or batch processing
 
 ## Security Notes
 
@@ -227,6 +257,11 @@ If you need persistent storage for the `tickers.xlsx` file:
 3. **API Errors**: Some tickers might not be available through Robinhood's API
 4. **Rate Limiting**: If fetching many tickers, you might encounter rate limits
 5. **Container Hanging on MFA**: In headless environments (Docker, Railway, CI), the application automatically detects the environment and skips interactive MFA prompts. Set `ROBINHOOD_MFA` environment variable if MFA is required.
+6. **502 Bad Gateway Errors**: If you encounter 502 errors:
+   - Ensure the application is deployed as a **Web Service**, not a Worker Service
+   - Verify that `WEB_MODE` is set to `true` (or not set, as this is the default)
+   - Check that the `PORT` environment variable is properly set by your deployment platform
+   - The application now includes a web server that responds to health checks at `/`
 
 ## License
 
