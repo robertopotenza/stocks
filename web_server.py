@@ -12,6 +12,7 @@ import sys
 import threading
 import time
 from datetime import datetime
+from typing import List, Dict, Any
 from flask import Flask, jsonify, request, render_template, send_file
 import pandas as pd
 from stock_prices import main as run_stock_fetcher, fetch_stock_data, load_tickers_from_excel
@@ -33,8 +34,51 @@ job_status = {
     'status': 'ready',  # ready, running, completed, error
     'last_run': None,
     'last_error': None,
-    'run_count': 0
+    'run_count': 0,
+    'last_sentiment': None,  # Cache sentiment data for current job run
+    'sentiment_timestamp': None  # When sentiment was last fetched
 }
+
+def get_cached_sentiment_for_tickers(tickers: List[str], ttl_minutes: int = 5) -> Dict[str, Any]:
+    """
+    Get cached sentiment analysis or fetch fresh data if needed.
+    
+    Args:
+        tickers: List of stock ticker symbols
+        ttl_minutes: Cache time-to-live in minutes
+        
+    Returns:
+        Dictionary containing sentiment analysis results
+    """
+    now = datetime.now()
+    
+    # Check if we have cached sentiment data that's still valid
+    if (job_status['last_sentiment'] is not None and 
+        job_status['sentiment_timestamp'] is not None):
+        
+        try:
+            cached_time = datetime.fromisoformat(job_status['sentiment_timestamp'])
+            age_minutes = (now - cached_time).total_seconds() / 60
+            
+            # Check if cache is still valid and has the same tickers
+            cached_tickers = set(job_status['last_sentiment'].get('tickers_analyzed', []))
+            requested_tickers = set(tickers)
+            
+            if age_minutes < ttl_minutes and cached_tickers >= requested_tickers:
+                logger.info(f"Using cached sentiment data (age: {age_minutes:.1f} minutes)")
+                return job_status['last_sentiment']
+        except Exception as e:
+            logger.warning(f"Error checking cached sentiment: {e}")
+    
+    # Cache miss or expired - fetch fresh sentiment data
+    logger.info(f"Fetching fresh sentiment data for {len(tickers)} tickers")
+    sentiment_data = analyze_portfolio_sentiment(tickers, days=5)
+    
+    # Cache the results
+    job_status['last_sentiment'] = sentiment_data
+    job_status['sentiment_timestamp'] = now.isoformat()
+    
+    return sentiment_data
 
 def run_stock_fetcher_async():
     """Run the stock fetcher in a background thread."""
@@ -46,6 +90,19 @@ def run_stock_fetcher_async():
         
         # Clear previous logs for this run
         clear_web_logs()
+        
+        # Pre-fetch sentiment analysis for current tickers to cache it
+        try:
+            tickers = load_tickers_from_excel(TICKERS_FILE)
+            if tickers:
+                limited_tickers = tickers[:10]  # Limit to prevent API overuse
+                logger.info(f"Pre-fetching sentiment analysis for {len(limited_tickers)} tickers")
+                sentiment_data = analyze_portfolio_sentiment(limited_tickers, days=5)
+                job_status['last_sentiment'] = sentiment_data
+                job_status['sentiment_timestamp'] = datetime.now().isoformat()
+                logger.info("Sentiment analysis cached for job run")
+        except Exception as e:
+            logger.warning(f"Failed to pre-fetch sentiment data: {e}")
         
         # Run the stock fetcher (logs will be captured automatically)
         run_stock_fetcher()
@@ -675,10 +732,10 @@ def get_sentiment_analysis():
         # Limit tickers to avoid overwhelming the APIs
         limited_tickers = tickers[:10]
         
-        logger.info(f"Running sentiment analysis on {len(limited_tickers)} tickers")
+        logger.info(f"Getting sentiment analysis for {len(limited_tickers)} tickers")
         
-        # Run sentiment analysis
-        sentiment_result = analyze_portfolio_sentiment(limited_tickers, days=5)
+        # Use cached sentiment analysis
+        sentiment_result = get_cached_sentiment_for_tickers(limited_tickers, ttl_minutes=5)
         
         logger.info(f"Sentiment analysis completed for {len(sentiment_result.get('tickers_analyzed', []))} tickers")
         
@@ -696,10 +753,10 @@ def get_ticker_sentiment(ticker):
     try:
         ticker = ticker.upper()
         
-        logger.info(f"Running sentiment analysis for {ticker}")
+        logger.info(f"Getting sentiment analysis for {ticker}")
         
-        # Run sentiment analysis for single ticker
-        sentiment_result = analyze_portfolio_sentiment([ticker], days=5)
+        # Use cached sentiment analysis for single ticker
+        sentiment_result = get_cached_sentiment_for_tickers([ticker], ttl_minutes=5)
         
         # Extract data for the specific ticker
         ticker_data = sentiment_result.get('sentiment_data', {}).get(ticker, {})
@@ -753,6 +810,9 @@ def get_combined_analysis():
         
         logger.info(f"Running combined analysis on {len(limited_tickers)} tickers")
         
+        # Get cached sentiment analysis data
+        cached_sentiment = get_cached_sentiment_for_tickers(limited_tickers, ttl_minutes=5)
+        
         # Check if we have recent stock data in the Excel file
         stock_data = None
         required_columns = ['Price', 'PE_Ratio', '52w_High', '52w_Low']
@@ -777,8 +837,8 @@ def get_combined_analysis():
         else:
             logger.info("No recent stock data found in Excel file, will fetch fresh data")
         
-        # Run combined analysis
-        combined_result = analyze_combined_portfolio(limited_tickers, stock_data)
+        # Run combined analysis with cached sentiment
+        combined_result = analyze_combined_portfolio(limited_tickers, stock_data, cached_sentiment)
         
         logger.info(f"Combined analysis completed. Top recommendation: {combined_result.get('summary', {}).get('top_recommendation', {}).get('ticker', 'N/A')}")
         

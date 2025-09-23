@@ -16,10 +16,14 @@ import requests
 from textblob import TextBlob
 from nltk.sentiment import SentimentIntensityAnalyzer
 import os
+import hashlib
 from logging_config import get_logger
 
 # Get logger instance
 logger = get_logger('stocks_app.sentiment_analysis')
+
+# Module-level sentiment cache with TTL
+_sentiment_cache = {}
 
 class SentimentAnalyzer:
     """Analyzes sentiment of text using multiple methods."""
@@ -128,7 +132,7 @@ class RedditSentimentFetcher:
             except Exception as e:
                 logger.warning(f"Failed to initialize Reddit client: {e}")
         else:
-            logger.warning("Reddit credentials not provided - Reddit sentiment will use demo data")
+            logger.warning("Reddit credentials not provided - Reddit sentiment will return empty data")
     
     def fetch_ticker_sentiment(self, ticker: str, days: int = 5) -> Dict[str, Any]:
         """
@@ -142,7 +146,7 @@ class RedditSentimentFetcher:
             Dictionary containing sentiment analysis results
         """
         if not self.reddit:
-            return self._get_demo_reddit_sentiment(ticker)
+            return self._get_empty_reddit_sentiment(ticker)
         
         try:
             # Search for posts about the ticker
@@ -182,7 +186,7 @@ class RedditSentimentFetcher:
             
         except Exception as e:
             logger.error(f"Error fetching Reddit sentiment for {ticker}: {e}")
-            return self._get_demo_reddit_sentiment(ticker)
+            return self._get_empty_reddit_sentiment(ticker)
     
     def _analyze_posts_sentiment(self, ticker: str, posts: List[Dict]) -> Dict[str, Any]:
         """Analyze sentiment of collected Reddit posts."""
@@ -219,52 +223,26 @@ class RedditSentimentFetcher:
         
         return self._calculate_overall_sentiment(ticker, 'reddit', sentiments, analyzed_posts)
     
-    def _get_demo_reddit_sentiment(self, ticker: str) -> Dict[str, Any]:
-        """Generate demo Reddit sentiment data when API is not available."""
-        import random
-        
-        # Generate realistic demo data
-        total_mentions = random.randint(15, 45)
-        
-        # Generate sentiment breakdown with some randomness
-        positive = random.randint(int(total_mentions * 0.2), int(total_mentions * 0.6))
-        negative = random.randint(int(total_mentions * 0.1), int(total_mentions * 0.4))
-        neutral = total_mentions - positive - negative
-        
-        if neutral < 0:
-            neutral = random.randint(1, 5)
-            total_mentions = positive + negative + neutral
-        
-        overall_score = (positive * 0.6 - negative * 0.6) / total_mentions if total_mentions > 0 else 0
-        
-        # Calculate sentiment percentages
-        pos_pct = round((positive / total_mentions) * 100, 1) if total_mentions > 0 else 0
-        neg_pct = round((negative / total_mentions) * 100, 1) if total_mentions > 0 else 0
-        
-        # Calculate standardized sentiment score: ((% Positive - % Negative) + 100) / 2
-        standardized_sentiment_score = ((pos_pct - neg_pct) + 100) / 2
-        
+    def _get_empty_reddit_sentiment(self, ticker: str) -> Dict[str, Any]:
+        """Return empty Reddit sentiment data when API is not available."""
         return {
             'ticker': ticker,
             'source': 'reddit',
-            'total_mentions': total_mentions,
+            'total_mentions': 0,
             'sentiment_breakdown': {
-                'positive': positive,
-                'neutral': neutral,
-                'negative': negative
+                'positive': 0,
+                'neutral': 0,
+                'negative': 0
             },
             'sentiment_percentages': {
-                'positive': pos_pct,
-                'neutral': round((neutral / total_mentions) * 100, 1) if total_mentions > 0 else 0,
-                'negative': neg_pct
+                'positive': 0.0,
+                'neutral': 0.0,
+                'negative': 0.0
             },
-            'overall_score': round(overall_score, 3),
-            'standardized_sentiment_score': round(standardized_sentiment_score, 1),
-            'trend_direction': 'improving' if overall_score > 0.1 else 'declining' if overall_score < -0.1 else 'stable',
-            'posts_analyzed': [
-                {'text': f'Demo post about {ticker}', 'sentiment': 'positive', 'score': 0.5, 'weight': 3},
-                {'text': f'Analysis of {ticker} performance', 'sentiment': 'neutral', 'score': 0.0, 'weight': 2}
-            ]
+            'overall_score': 0.0,
+            'standardized_sentiment_score': 50.0,  # Neutral on 0-100 scale
+            'trend_direction': 'stable',
+            'posts_analyzed': []
         }
     
     def _calculate_overall_sentiment(self, ticker: str, source: str, sentiments: List[Dict], posts: List[Dict]) -> Dict[str, Any]:
@@ -343,7 +321,7 @@ class TwitterSentimentFetcher:
             except Exception as e:
                 logger.warning(f"Failed to initialize Twitter client: {e}")
         else:
-            logger.warning("Twitter credentials not provided - Twitter sentiment will use demo data")
+            logger.warning("Twitter credentials not provided - Twitter sentiment will return empty data")
     
     def fetch_ticker_sentiment(self, ticker: str, days: int = 5) -> Dict[str, Any]:
         """
@@ -357,7 +335,7 @@ class TwitterSentimentFetcher:
             Dictionary containing sentiment analysis results
         """
         if not self.client:
-            return self._get_demo_twitter_sentiment(ticker)
+            return self._get_empty_twitter_sentiment(ticker)
         
         try:
             # Search for tweets about the ticker
@@ -390,14 +368,14 @@ class TwitterSentimentFetcher:
             
             except Exception as e:
                 logger.warning(f"Error fetching tweets for {ticker}: {e}")
-                return self._get_demo_twitter_sentiment(ticker)
+                return self._get_empty_twitter_sentiment(ticker)
             
             # Analyze sentiment of collected tweets
             return self._analyze_tweets_sentiment(ticker, tweets)
             
         except Exception as e:
             logger.error(f"Error fetching Twitter sentiment for {ticker}: {e}")
-            return self._get_demo_twitter_sentiment(ticker)
+            return self._get_empty_twitter_sentiment(ticker)
     
     def _analyze_tweets_sentiment(self, ticker: str, tweets: List[Dict]) -> Dict[str, Any]:
         """Analyze sentiment of collected tweets."""
@@ -456,52 +434,26 @@ class TwitterSentimentFetcher:
         
         return text.strip()
     
-    def _get_demo_twitter_sentiment(self, ticker: str) -> Dict[str, Any]:
-        """Generate demo Twitter sentiment data when API is not available."""
-        import random
-        
-        # Generate realistic demo data
-        total_mentions = random.randint(25, 75)
-        
-        # Generate sentiment breakdown with some randomness
-        positive = random.randint(int(total_mentions * 0.25), int(total_mentions * 0.55))
-        negative = random.randint(int(total_mentions * 0.15), int(total_mentions * 0.35))
-        neutral = total_mentions - positive - negative
-        
-        if neutral < 0:
-            neutral = random.randint(1, 8)
-            total_mentions = positive + negative + neutral
-        
-        overall_score = (positive * 0.5 - negative * 0.5) / total_mentions if total_mentions > 0 else 0
-        
-        # Calculate sentiment percentages
-        pos_pct = round((positive / total_mentions) * 100, 1) if total_mentions > 0 else 0
-        neg_pct = round((negative / total_mentions) * 100, 1) if total_mentions > 0 else 0
-        
-        # Calculate standardized sentiment score: ((% Positive - % Negative) + 100) / 2
-        standardized_sentiment_score = ((pos_pct - neg_pct) + 100) / 2
-        
+    def _get_empty_twitter_sentiment(self, ticker: str) -> Dict[str, Any]:
+        """Return empty Twitter sentiment data when API is not available."""
         return {
             'ticker': ticker,
             'source': 'twitter',
-            'total_mentions': total_mentions,
+            'total_mentions': 0,
             'sentiment_breakdown': {
-                'positive': positive,
-                'neutral': neutral,
-                'negative': negative
+                'positive': 0,
+                'neutral': 0,
+                'negative': 0
             },
             'sentiment_percentages': {
-                'positive': pos_pct,
-                'neutral': round((neutral / total_mentions) * 100, 1) if total_mentions > 0 else 0,
-                'negative': neg_pct
+                'positive': 0.0,
+                'neutral': 0.0,
+                'negative': 0.0
             },
-            'overall_score': round(overall_score, 3),
-            'standardized_sentiment_score': round(standardized_sentiment_score, 1),
-            'trend_direction': 'improving' if overall_score > 0.1 else 'declining' if overall_score < -0.1 else 'stable',
-            'posts_analyzed': [
-                {'text': f'Demo tweet about {ticker} performance', 'sentiment': 'positive', 'score': 0.4, 'weight': 5},
-                {'text': f'Market analysis for {ticker}', 'sentiment': 'neutral', 'score': 0.0, 'weight': 2}
-            ]
+            'overall_score': 0.0,
+            'standardized_sentiment_score': 50.0,  # Neutral on 0-100 scale
+            'trend_direction': 'stable',
+            'posts_analyzed': []
         }
     
     def _calculate_overall_sentiment(self, ticker: str, source: str, sentiments: List[Dict], posts: List[Dict]) -> Dict[str, Any]:
@@ -686,9 +638,50 @@ class SocialMediaSentimentAnalyzer:
             'error': 'Unable to fetch sentiment data'
         }
 
-def analyze_portfolio_sentiment(tickers: List[str], days: int = 5) -> Dict[str, Any]:
+def get_cached_portfolio_sentiment(tickers: List[str], days: int = 5, ttl_seconds: int = 300) -> Dict[str, Any]:
     """
-    Main function to analyze sentiment for a portfolio of stocks.
+    Get cached portfolio sentiment analysis with TTL functionality.
+    
+    Args:
+        tickers: List of stock ticker symbols
+        days: Number of days to look back
+        ttl_seconds: Time-to-live for cache entries in seconds (default: 5 minutes)
+        
+    Returns:
+        Dictionary containing sentiment analysis for all tickers
+    """
+    # Create cache key based on sorted tickers and days
+    key = (tuple(sorted(tickers)), days)
+    now = datetime.now()
+    
+    # Check if we have a valid cached entry
+    entry = _sentiment_cache.get(key)
+    if entry and (now - entry['timestamp']).total_seconds() < ttl_seconds:
+        logger.info(f"Using cached sentiment data for {len(tickers)} tickers (age: {(now - entry['timestamp']).total_seconds():.1f}s)")
+        return entry['data']
+    
+    # Cache miss or expired - fetch fresh data
+    logger.info(f"Fetching fresh sentiment data for {len(tickers)} tickers")
+    data = _analyze_portfolio_sentiment_original(tickers, days)
+    
+    # Store in cache
+    _sentiment_cache[key] = {
+        'timestamp': now,
+        'data': data
+    }
+    
+    # Clean up old cache entries (simple cleanup - remove entries older than 1 hour)
+    cutoff_time = now - timedelta(hours=1)
+    expired_keys = [k for k, v in _sentiment_cache.items() if v['timestamp'] < cutoff_time]
+    for expired_key in expired_keys:
+        del _sentiment_cache[expired_key]
+    
+    logger.info(f"Cached sentiment data for {len(tickers)} tickers. Cache size: {len(_sentiment_cache)}")
+    return data
+
+def _analyze_portfolio_sentiment_original(tickers: List[str], days: int = 5) -> Dict[str, Any]:
+    """
+    Original implementation of portfolio sentiment analysis (now internal).
     
     Args:
         tickers: List of stock ticker symbols
@@ -706,16 +699,22 @@ def analyze_portfolio_sentiment(tickers: List[str], days: int = 5) -> Dict[str, 
     total_mentions = sum(data['total_mentions'] for data in sentiment_results.values())
     
     if total_mentions > 0:
-        # Calculate weighted average sentiment score
+        # Calculate weighted average sentiment score (raw -1 to 1 scale)
         weighted_score = sum(
             data['overall_sentiment_score'] * data['total_mentions'] 
             for data in sentiment_results.values()
         ) / total_mentions
         
-        # Find most positive and most negative stocks
+        # Calculate weighted average standardized sentiment score (0-100 scale)
+        weighted_standardized_score = sum(
+            data['standardized_sentiment_score'] * data['total_mentions'] 
+            for data in sentiment_results.values()
+        ) / total_mentions
+        
+        # Find most positive and most negative stocks (using standardized score)
         sorted_by_sentiment = sorted(
             sentiment_results.items(),
-            key=lambda x: x[1]['overall_sentiment_score'],
+            key=lambda x: x[1]['standardized_sentiment_score'],
             reverse=True
         )
         
@@ -723,6 +722,7 @@ def analyze_portfolio_sentiment(tickers: List[str], days: int = 5) -> Dict[str, 
         most_negative = sorted_by_sentiment[-1] if sorted_by_sentiment else None
     else:
         weighted_score = 0.0
+        weighted_standardized_score = 50.0  # Neutral on 0-100 scale
         most_positive = None
         most_negative = None
     
@@ -731,7 +731,8 @@ def analyze_portfolio_sentiment(tickers: List[str], days: int = 5) -> Dict[str, 
         'sentiment_data': sentiment_results,
         'portfolio_summary': {
             'total_mentions_across_all_tickers': total_mentions,
-            'average_sentiment_score': round(weighted_score, 3),
+            'average_sentiment_score': round(weighted_score, 3),  # Legacy raw score
+            'average_standardized_sentiment_score': round(weighted_standardized_score, 1),  # Standardized 0-100 score
             'most_positive_ticker': most_positive[0] if most_positive else None,
             'most_negative_ticker': most_negative[0] if most_negative else None,
             'analysis_period_days': days,
@@ -739,10 +740,24 @@ def analyze_portfolio_sentiment(tickers: List[str], days: int = 5) -> Dict[str, 
         }
     }
 
+def analyze_portfolio_sentiment(tickers: List[str], days: int = 5) -> Dict[str, Any]:
+    """
+    Main function to analyze sentiment for a portfolio of stocks (with caching).
+    
+    Args:
+        tickers: List of stock ticker symbols
+        days: Number of days to look back
+        
+    Returns:
+        Dictionary containing sentiment analysis for all tickers
+    """
+    return get_cached_portfolio_sentiment(tickers, days)
+
 if __name__ == "__main__":
-    # Demo usage
+    # Test usage
     test_tickers = ["AAPL", "GOOGL", "MSFT"]
     results = analyze_portfolio_sentiment(test_tickers)
     print(f"Analyzed sentiment for {len(results['tickers_analyzed'])} tickers")
     print(f"Total mentions: {results['portfolio_summary']['total_mentions_across_all_tickers']}")
-    print(f"Average sentiment: {results['portfolio_summary']['average_sentiment_score']}")
+    print(f"Average standardized sentiment: {results['portfolio_summary']['average_standardized_sentiment_score']}")
+    print(f"Cache stats: {len(_sentiment_cache)} entries cached")
