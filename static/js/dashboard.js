@@ -2,6 +2,7 @@
 
 let statusUpdateInterval;
 let isJobRunning = false;
+let currentPollInterval = 15000; // Track current polling interval
 
 // Initialize dashboard when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -20,12 +21,16 @@ function startStatusUpdates() {
         clearInterval(statusUpdateInterval);
     }
     
+    // Intelligent polling: faster when job is running, slower when idle
+    const pollInterval = isJobRunning ? 5000 : 15000; // 5s when running, 15s when idle
+    currentPollInterval = pollInterval;
+    
     statusUpdateInterval = setInterval(function() {
         refreshStatus();
         if (isJobRunning) {
-            loadLogs(); // Update logs more frequently when job is running
+            loadLogs(); // Update logs when job is running
         }
-    }, 3000); // Update every 3 seconds
+    }, pollInterval);
 }
 
 // Stop periodic updates
@@ -91,8 +96,11 @@ function updateStatusDisplay(status) {
         lastError.className = 'fw-bold text-success';
     }
     
-    // Update button state
+    // Check if job status changed and adjust polling frequency
+    const wasRunning = isJobRunning;
     isJobRunning = statusText === 'running';
+    
+    // Update button state
     if (isJobRunning) {
         startButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Running...';
         startButton.disabled = true;
@@ -101,6 +109,15 @@ function updateStatusDisplay(status) {
         startButton.innerHTML = '<i class="fas fa-play me-2"></i>Start Data Fetch';
         startButton.disabled = false;
         startButton.className = 'btn btn-primary w-100';
+    }
+    
+    // If job status changed, restart polling with appropriate frequency
+    if (wasRunning !== isJobRunning) {
+        console.log(`Job status changed: ${wasRunning ? 'running' : 'idle'} -> ${isJobRunning ? 'running' : 'idle'}`);
+        const newPollInterval = isJobRunning ? 5000 : 15000;
+        if (newPollInterval !== currentPollInterval) {
+            startStatusUpdates(); // Restart with new frequency
+        }
     }
     
     // Update last update time
@@ -224,7 +241,7 @@ async function loadLogs() {
 
 // Add new ticker
 async function addTicker() {
-    const tickerInput = document.getElementById('tickerSymbol');
+    const tickerInput = document.getElementById('ticker-input');
     const ticker = tickerInput.value.trim().toUpperCase();
     
     if (!ticker) {
@@ -233,7 +250,7 @@ async function addTicker() {
     }
     
     try {
-        const response = await fetch('/api/add_ticker', {
+        const response = await fetch('/add-ticker', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -254,9 +271,30 @@ async function addTicker() {
             tickerInput.value = '';
             
             // Hide modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('addTickerModal'));
+            const modal = document.getElementById('addTickerModal');
             if (modal) {
-                modal.hide();
+                // Try to use Bootstrap modal if available
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                    if (bootstrapModal) {
+                        bootstrapModal.hide();
+                    }
+                } else {
+                    // Fallback: hide modal manually
+                    modal.style.display = 'none';
+                    modal.classList.remove('show');
+                    modal.setAttribute('aria-hidden', 'true');
+                    
+                    // Remove backdrop if exists
+                    const backdrop = document.querySelector('.modal-backdrop');
+                    if (backdrop) {
+                        backdrop.remove();
+                    }
+                    
+                    // Remove modal-open class from body
+                    document.body.classList.remove('modal-open');
+                    document.body.style.paddingRight = '';
+                }
             }
             
             // Refresh data
@@ -360,7 +398,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Handle Enter key in ticker input
-    const tickerInput = document.getElementById('tickerSymbol');
+    const tickerInput = document.getElementById('ticker-input');
     if (tickerInput) {
         tickerInput.addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
