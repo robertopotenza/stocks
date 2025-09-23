@@ -104,6 +104,17 @@ class StockEvaluator:
         # Determine overall recommendation
         recommendation = self._get_recommendation(total_score)
         
+        # Extract sentiment information for the record
+        sentiment_data = data.get('sentiment_data', {})
+        sentiment_info = None
+        if sentiment_data and sentiment_data.get('total_mentions', 0) > 0:
+            sentiment_info = {
+                'overall_sentiment_score': sentiment_data.get('overall_sentiment_score', 0.0),
+                'total_mentions': sentiment_data.get('total_mentions', 0),
+                'trend_direction': sentiment_data.get('trend_direction', 'stable'),
+                'sentiment_percentages': sentiment_data.get('sentiment_percentages', {})
+            }
+
         return {
             'ticker': ticker,
             'total_score': round(total_score, 2),
@@ -123,7 +134,9 @@ class StockEvaluator:
             'distance_from_52w_high': data.get('Distance_from_52w_High_Pct', 'N/A'),
             'valuation_flag': data.get('Valuation_Flag', 'N/A'),
             'entry_flag': data.get('Entry_Opportunity_Flag', 'N/A'),
-            'price_level_flag': data.get('Price_Level_Flag', 'N/A')
+            'price_level_flag': data.get('Price_Level_Flag', 'N/A'),
+            'sentiment_data': sentiment_info,
+            'sentiment': sentiment_data.get('overall_sentiment_score', 0.0) if sentiment_data else 0.0
         }
     
     def _score_technical_position(self, data: Dict[str, Any]) -> float:
