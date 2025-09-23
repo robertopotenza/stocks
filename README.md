@@ -127,6 +127,46 @@ The Excel file (`tickers.xlsx`) will be updated with new columns containing the 
 | GOOGL  | 2750.80| 3030.93  | 2193.62 | 1800000000000  | 25.2     |
 | ...    | ...    | ...      | ...     | ...            | ...      |
 
+## Railway Deployment
+
+This repository is ready for deployment on Railway. Railway will automatically detect the `Procfile` and deploy this as a Worker service (no HTTP port exposed).
+
+### Quick Deploy to Railway
+
+1. **Deploy with Railway CLI** (recommended):
+   ```bash
+   npm install -g @railway/cli
+   railway login
+   railway init
+   railway up
+   ```
+
+2. **Deploy via GitHub Integration**:
+   - Connect your GitHub repository to Railway
+   - Railway will automatically detect the `Procfile` and `Dockerfile`
+   - Select "Worker" as the service type during setup
+
+### Required Environment Variables
+
+Set these environment variables in your Railway project:
+
+- `ROBINHOOD_USERNAME`: Your Robinhood email/username
+- `ROBINHOOD_PASSWORD`: Your Robinhood password  
+- `TICKERS_FILE`: Set to `tickers.xlsx` if keeping the Excel file in the repository
+
+### Database Storage (Optional)
+
+If you need persistent storage for the `tickers.xlsx` file:
+
+1. Add a database service to your Railway project (PostgreSQL/MySQL)
+2. Use the provided database environment variables to connect
+3. Modify the application to store ticker data in the database instead of Excel
+
+### Railway Configuration Files
+
+- `Dockerfile`: Containerizes the application for Railway
+- `Procfile`: Specifies this as a Worker service (`worker: python main.py`)
+
 ## Security Notes
 
 - Never commit your actual credentials to version control
