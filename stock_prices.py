@@ -26,7 +26,7 @@ def login_to_robinhood(username: str, password: str) -> bool:
     Login to Robinhood with optional non-interactive MFA support.
 
     If ROBINHOOD_MFA environment variable is set, it will be used.
-    Otherwise the function will prompt for MFA (interactive) only if running 
+    Otherwise the function will prompt for MFA (interactive) only if running
     in an interactive environment.
     """
     try:
@@ -36,16 +36,27 @@ def login_to_robinhood(username: str, password: str) -> bool:
             mfa_code = mfa_code.strip() or None
         else:
             # Check if we're in an interactive environment
-            # Detect headless/containerized environments
+            # Robust headless/containerized environment detection
+            def is_docker_environment():
+                """Detect if running in Docker container."""
+                # Check for /.dockerenv file (most reliable)
+                if os.path.exists("/.dockerenv"):
+                    return True
+                # Check cgroup for docker container info
+                try:
+                    with open("/proc/1/cgroup", "r") as f:
+                        return "docker" in f.read()
+                except (OSError, IOError):
+                    pass
+                return False
+
             is_interactive = (
-                sys.stdin.isatty() and 
-                sys.stdout.isatty() and 
+                sys.stdin.isatty() and
+                sys.stdout.isatty() and
                 os.getenv("TERM") is not None and
                 not os.getenv("CI") and  # Not in CI environment
-                not os.getenv("DOCKER_CONTAINER") and  # Not in Docker
-                not os.getenv("RAILWAY_ENVIRONMENT")  # Not in Railway
+                not is_docker_environment()  # Not in Docker
             )
-            
             if is_interactive:
                 # interactive fallback (only available on interactive platforms)
                 try:
