@@ -12,6 +12,18 @@ A Python script that fetches comprehensive stock data from Robinhood for a list 
   - **Technical Analysis Levels (NEW!):**
     - **Pivot Point Support & Resistance**: Calculated using daily high, low, close prices
     - **Recent Support & Resistance**: Based on recent price action analysis over 20-day lookback period
+- **🔥 Social Media Sentiment Analysis (NEW!):**
+  - **Reddit Integration**: Analyzes posts from investing subreddits (/r/investing, /r/stocks, etc.)
+  - **Twitter/X Integration**: Fetches and analyzes recent tweets about stock tickers
+  - **Advanced Sentiment Scoring**: Uses TextBlob and VADER sentiment analysis
+  - **Portfolio-wide Metrics**: Overall sentiment scores, most positive/negative stocks
+  - **Trend Analysis**: 5-day sentiment trend direction (improving/declining/stable)
+  - **Visual Dashboard**: Comprehensive sentiment display with color-coded metrics
+- **🤖 AI-Powered Stock Evaluation:**
+  - **Multi-factor Analysis**: Technical position, valuation, risk/reward, momentum, and sentiment
+  - **Intelligent Scoring**: Weighted scoring system with plain English explanations
+  - **Stock Rankings**: Automatically ranks stocks from most to least attractive
+  - **Investment Recommendations**: Buy/Hold/Avoid recommendations with detailed reasoning
 - Reads ticker symbols from Excel file
 - Writes results back to Excel file with new columns
 - Supports Multi-Factor Authentication (MFA)
@@ -41,6 +53,12 @@ A Python script that fetches comprehensive stock data from Robinhood for a list 
 export ROBINHOOD_USERNAME=your_email@example.com
 export ROBINHOOD_PASSWORD=your_password
 export ROBINHOOD_MFA=123456  # Optional: For non-interactive MFA (useful for deployment)
+
+# Social Media Sentiment Analysis (Optional - will use demo data if not provided)
+export REDDIT_CLIENT_ID=your_reddit_client_id
+export REDDIT_CLIENT_SECRET=your_reddit_client_secret
+export REDDIT_USER_AGENT=YourApp/1.0
+export TWITTER_BEARER_TOKEN=your_twitter_bearer_token
 ```
 
 **Note**: For Multi-Factor Authentication (MFA), you can either:
@@ -308,6 +326,55 @@ If you need persistent storage for the `tickers.xlsx` file:
 - Runs the stock fetching script once and exits
 - Set `WEB_MODE=false` for this mode
 - Suitable for scheduled jobs or batch processing
+
+## Web Dashboard
+
+When running in web mode (`WEB_MODE=true`, which is the default), the application provides a comprehensive web dashboard accessible via your browser.
+
+### Dashboard Features
+
+**🏠 Main Dashboard** (`/dashboard`)
+- **Job Controls**: Start data fetch jobs and monitor status
+- **Ticker Management**: View total tickers and add new ones via modal
+- **Real-time Logs**: View captured application logs with auto-refresh
+
+**🤖 AI Stock Evaluation**
+- **Comprehensive Analysis**: Multi-factor evaluation including technical analysis, valuation, risk/reward, momentum, and sentiment
+- **Smart Rankings**: Automatically ranks stocks from most to least attractive with confidence scores
+- **Plain English Explanations**: AI-generated commentary for each stock evaluation
+- **Visual Indicators**: Color-coded recommendations (Strong Buy, Buy, Hold, Weak Hold, Avoid)
+- **Demo Mode**: Test the system with sample data
+
+**📱 Social Media Sentiment Analysis**
+- **Portfolio Sentiment**: Analyze sentiment for all your tickers at once
+- **Real-time Data**: Fetches posts from Reddit (investing subreddits) and Twitter/X
+- **Advanced Metrics**:
+  - Total mentions across platforms
+  - Positive/Neutral/Negative percentage breakdown
+  - Overall sentiment scores (-1 to +1 scale)
+  - Trend direction indicators (improving/declining/stable)
+- **Visual Display**: Color-coded sentiment badges and trend arrows
+- **Ranking Table**: Stocks sorted by sentiment from most positive to most negative
+
+### API Endpoints
+
+- **`GET /`** - Health check and redirect to dashboard
+- **`GET /dashboard`** - Main web dashboard interface
+- **`GET /run`** - Trigger stock data fetching job  
+- **`GET /status`** - Get current job status
+- **`GET /logs`** - View captured application logs
+- **`GET /ai-evaluation`** - Run AI evaluation with sentiment integration
+- **`GET /quick-evaluation`** - Quick AI evaluation with fresh data
+- **`GET /demo-evaluation`** - Demo AI evaluation with sample data
+- **`GET /sentiment-analysis`** - Analyze sentiment for current tickers
+- **`GET /ticker-sentiment/<ticker>`** - Get sentiment for specific ticker
+
+### Demo Mode
+
+If you don't have Reddit/Twitter API credentials or Robinhood credentials, the system automatically falls back to realistic demo data:
+- **Sentiment Analysis**: Uses simulated social media data with realistic mention counts and sentiment scores
+- **AI Evaluation**: Provides sample stock evaluations with demo data
+- **Full Functionality**: All dashboard features work without requiring API credentials
 
 ## Security Notes
 
