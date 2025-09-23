@@ -23,8 +23,8 @@ class CombinedStockAnalyzer:
         """Initialize the combined analyzer with weighting factors."""
         # Weighting for final combined score (should sum to 1.0)
         self.weights = {
-            'ai_evaluation': 0.7,    # AI technical/fundamental analysis weight
-            'sentiment': 0.3         # Social media sentiment weight
+            'ai_evaluation': 0.6,    # AI technical/fundamental analysis weight
+            'sentiment': 0.4         # Social media sentiment weight
         }
         
         # Score thresholds for combined recommendations
@@ -116,7 +116,7 @@ class CombinedStockAnalyzer:
             'methodology': {
                 'ai_weight': self.weights['ai_evaluation'],
                 'sentiment_weight': self.weights['sentiment'],
-                'description': 'Combined score = (AI Score × 0.7) + (Sentiment Score × 0.3)'
+                'description': 'Combined score = (AI Score × 0.6) + (Sentiment Score × 0.4)'
             }
         }
     

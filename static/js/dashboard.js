@@ -865,3 +865,165 @@ function getTrendIcon(trend) {
             return '→';
     }
 }
+
+// Routine Analysis Functions
+
+// Run comprehensive routine analysis combining AI evaluation and sentiment analysis
+async function runRoutineAnalysis() {
+    const loadingElement = document.getElementById('routine-analysis-loading');
+    const placeholderElement = document.getElementById('routine-analysis-placeholder');
+    const summarySection = document.getElementById('routine-summary-section');
+    const rankingsContainer = document.getElementById('routine-rankings-container');
+    
+    try {
+        // Show loading state
+        loadingElement.style.display = 'block';
+        placeholderElement.style.display = 'none';
+        summarySection.style.display = 'none';
+        rankingsContainer.style.display = 'none';
+        
+        showSuccess('Running comprehensive routine analysis...');
+        
+        const response = await fetch('/combined-analysis');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Display results
+        displayRoutineAnalysis(data);
+        showSuccess('Routine analysis completed successfully!');
+        
+    } catch (error) {
+        console.error('Error running routine analysis:', error);
+        showError('Routine analysis failed: ' + error.message);
+        
+        // Hide loading and show placeholder
+        loadingElement.style.display = 'none';
+        placeholderElement.style.display = 'block';
+        
+    } finally {
+        loadingElement.style.display = 'none';
+    }
+}
+
+// Display routine analysis results
+function displayRoutineAnalysis(data) {
+    const loadingElement = document.getElementById('routine-analysis-loading');
+    const placeholderElement = document.getElementById('routine-analysis-placeholder');
+    const summarySection = document.getElementById('routine-summary-section');
+    const rankingsContainer = document.getElementById('routine-rankings-container');
+    
+    // Hide loading and placeholder
+    loadingElement.style.display = 'none';
+    placeholderElement.style.display = 'none';
+    
+    // Update summary statistics
+    const buyCount = document.getElementById('routine-buy-count');
+    const holdCount = document.getElementById('routine-hold-count');
+    const avoidCount = document.getElementById('routine-avoid-count');
+    const totalCount = document.getElementById('routine-total-analyzed');
+    
+    if (buyCount) buyCount.textContent = data.summary?.buy_recommendations || 0;
+    if (holdCount) holdCount.textContent = data.summary?.hold_recommendations || 0;
+    if (avoidCount) avoidCount.textContent = data.summary?.avoid_recommendations || 0;
+    if (totalCount) totalCount.textContent = data.summary?.total_stocks_analyzed || 0;
+    
+    // Update top recommendation
+    const topRecommendation = document.getElementById('routine-top-recommendation');
+    if (topRecommendation) {
+        const topRec = data.summary?.top_recommendation;
+        if (topRec && topRec.ticker) {
+            topRecommendation.innerHTML = `
+                <strong>${topRec.ticker}</strong> with combined score ${(topRec.combined_score || 0).toFixed(1)}/100 
+                (${topRec.recommendation})
+            `;
+        } else {
+            topRecommendation.textContent = 'No stocks available for analysis';
+        }
+    }
+    
+    // Show summary section
+    if (summarySection) {
+        summarySection.style.display = 'block';
+    }
+    
+    // Populate rankings table
+    const tbody = document.getElementById('routine-rankings-tbody');
+    if (tbody && data.combined_rankings) {
+        tbody.innerHTML = '';
+        
+        data.combined_rankings.forEach((stock, index) => {
+            const row = document.createElement('tr');
+            row.className = getRoutineRecommendationRowClass(stock.combined_recommendation);
+            
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td><strong>${stock.ticker}</strong></td>
+                <td>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar ${getRoutineScoreProgressClass(stock.combined_score)}" 
+                             role="progressbar" 
+                             style="width: ${stock.combined_score}%"
+                             aria-valuenow="${stock.combined_score}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            ${(stock.combined_score || 0).toFixed(1)}
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge ${getRoutineRecommendationBadgeClass(stock.combined_recommendation)}">
+                        ${stock.combined_recommendation}
+                    </span>
+                </td>
+                <td class="text-center">${(stock.ai_evaluation?.score || 0).toFixed(1)}</td>
+                <td class="text-center">${(stock.sentiment_analysis?.score || 0).toFixed(1)}</td>
+                <td class="small">${stock.ai_evaluation?.reasoning || stock.sentiment_analysis?.summary || 'No analysis available'}</td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+        
+        // Show rankings container
+        rankingsContainer.style.display = 'block';
+    }
+}
+
+// Helper functions for routine analysis display
+function getRoutineRecommendationRowClass(recommendation) {
+    switch (recommendation?.toLowerCase()) {
+        case 'buy':
+            return 'table-success';
+        case 'hold':
+            return 'table-warning';
+        case 'avoid':
+            return 'table-danger';
+        default:
+            return '';
+    }
+}
+
+function getRoutineRecommendationBadgeClass(recommendation) {
+    switch (recommendation?.toLowerCase()) {
+        case 'buy':
+            return 'bg-success';
+        case 'hold':
+            return 'bg-warning text-dark';
+        case 'avoid':
+            return 'bg-danger';
+        default:
+            return 'bg-secondary';
+    }
+}
+
+function getRoutineScoreProgressClass(score) {
+    if (score >= 75) return 'bg-success';
+    if (score >= 50) return 'bg-warning';
+    return 'bg-danger';
+}
