@@ -108,6 +108,9 @@ dmypy.json
 # Configuration files with credentials
 config.py
 
+# Test files
+test_*.py
+
 # IDE files
 .vscode/
 .idea/
