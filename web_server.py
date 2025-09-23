@@ -12,7 +12,7 @@ import sys
 import threading
 import time
 from datetime import datetime
-from flask import Flask, jsonify, request, render_template
+from flask import Flask, jsonify, request, render_template, send_file
 import pandas as pd
 from stock_prices import main as run_stock_fetcher
 from logging_config import setup_logging, get_web_logs, clear_web_logs, get_logger
@@ -212,6 +212,35 @@ def add_ticker():
     except Exception as e:
         logger.error(f"Error adding ticker: {e}")
         return jsonify({'error': f'Failed to add ticker: {str(e)}'}), 500
+
+@app.route('/download-excel')
+def download_excel():
+    """Download the current stock data Excel file."""
+    logger.debug("Excel download endpoint accessed")
+    
+    try:
+        if not os.path.exists(TICKERS_FILE):
+            return jsonify({
+                'error': 'No stock data file available for download'
+            }), 404
+        
+        # Generate a filename with timestamp
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        download_filename = f"stock_data_{timestamp}.xlsx"
+        
+        logger.info(f"Serving Excel file download: {TICKERS_FILE} as {download_filename}")
+        
+        return send_file(
+            TICKERS_FILE,
+            as_attachment=True,
+            download_name=download_filename,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        
+    except Exception as e:
+        logger.error(f"Error downloading Excel file: {e}")
+        return jsonify({'error': f'Failed to download Excel file: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # Get port from environment (Railway, Heroku, etc.)
