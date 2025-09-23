@@ -45,7 +45,8 @@ export ROBINHOOD_MFA=123456  # Optional: For non-interactive MFA (useful for dep
 
 **Note**: For Multi-Factor Authentication (MFA), you can either:
 - Set `ROBINHOOD_MFA` environment variable for non-interactive mode (useful for headless deployments)
-- Leave it unset to be prompted interactively for the MFA code
+- Leave it unset to be prompted interactively for the MFA code (only in interactive environments)
+- In headless environments (Docker, Railway, CI), the application will automatically skip MFA prompts and proceed without MFA if the environment variable is not set
 
 ### Method 2: Configuration File
 1. Copy the example configuration:
@@ -225,6 +226,7 @@ If you need persistent storage for the `tickers.xlsx` file:
 2. **Missing Tickers**: Check that your Excel file has a 'Ticker' column with valid stock symbols
 3. **API Errors**: Some tickers might not be available through Robinhood's API
 4. **Rate Limiting**: If fetching many tickers, you might encounter rate limits
+5. **Container Hanging on MFA**: In headless environments (Docker, Railway, CI), the application automatically detects the environment and skips interactive MFA prompts. Set `ROBINHOOD_MFA` environment variable if MFA is required.
 
 ## License
 

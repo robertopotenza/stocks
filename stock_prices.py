@@ -11,6 +11,7 @@ back to the Excel file.
 import robin_stocks.robinhood as r
 import pandas as pd
 import os
+import sys
 from typing import Dict, List, Any
 from technical_analysis import calculate_technical_levels
 
@@ -25,7 +26,8 @@ def login_to_robinhood(username: str, password: str) -> bool:
     Login to Robinhood with optional non-interactive MFA support.
 
     If ROBINHOOD_MFA environment variable is set, it will be used.
-    Otherwise the function will prompt for MFA (interactive).
+    Otherwise the function will prompt for MFA (interactive) only if running 
+    in an interactive environment.
     """
     try:
         # Try to get MFA code from environment first (non-interactive)
@@ -33,13 +35,30 @@ def login_to_robinhood(username: str, password: str) -> bool:
         if mfa_code:
             mfa_code = mfa_code.strip() or None
         else:
-            # interactive fallback (not available on headless platforms)
-            try:
-                mfa_code = input("MFA Code (press Enter if no MFA): ").strip()
-                if not mfa_code:
+            # Check if we're in an interactive environment
+            # Detect headless/containerized environments
+            is_interactive = (
+                sys.stdin.isatty() and 
+                sys.stdout.isatty() and 
+                os.getenv("TERM") is not None and
+                not os.getenv("CI") and  # Not in CI environment
+                not os.getenv("DOCKER_CONTAINER") and  # Not in Docker
+                not os.getenv("RAILWAY_ENVIRONMENT")  # Not in Railway
+            )
+            
+            if is_interactive:
+                # interactive fallback (only available on interactive platforms)
+                try:
+                    mfa_code = input("MFA Code (press Enter if no MFA): ").strip()
+                    if not mfa_code:
+                        mfa_code = None
+                except Exception:
+                    # If input() isn't available, proceed without MFA (may fail)
                     mfa_code = None
-            except Exception:
-                # If input() isn't available, proceed without MFA (may fail)
+            else:
+                # In headless environment, skip MFA prompt and proceed without it
+                print("ℹ️  Running in headless environment - skipping MFA prompt")
+                print("   Set ROBINHOOD_MFA environment variable if MFA is required")
                 mfa_code = None
 
         login = r.login(username, password, mfa_code=mfa_code)
