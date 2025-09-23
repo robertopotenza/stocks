@@ -210,27 +210,26 @@ class StockEvaluator:
         return max(0, min(100, score))
     
     def _score_risk_reward(self, data: Dict[str, Any]) -> float:
-        """Score based on risk/reward ratio."""
-        score = 50.0  # Neutral base score
-        
+        """Score based on risk/reward ratio using standardized normalization."""
         risk_reward = data.get('Risk_Reward_Ratio')
         entry_flag = data.get('Entry_Opportunity_Flag')
         
-        if isinstance(risk_reward, (int, float)):
-            if risk_reward > 3:  # Excellent risk/reward
-                score += 40
-            elif risk_reward > 2:  # Good risk/reward
-                score += 25
-            elif risk_reward > 1.5:  # Decent risk/reward
-                score += 10
-            elif risk_reward < 1:  # Poor risk/reward
-                score -= 30
+        # Base score using direct ratio normalization as specified
+        # RR Score = min(100, (RR/Max RR) × 100)
+        # Using max RR = 10 as suggested in requirements
+        max_rr = 10.0
         
-        # Adjust based on entry flag
+        if isinstance(risk_reward, (int, float)) and risk_reward > 0:
+            # Direct ratio normalization: RR Score = min(100, (RR/Max RR) × 100)
+            score = min(100, (risk_reward / max_rr) * 100)
+        else:
+            score = 0.0  # No risk/reward data available
+        
+        # Adjust based on entry flag (small adjustment to the normalized score)
         if entry_flag == "Favorable":
-            score += 15
+            score = min(100, score + 10)  # Bonus for favorable entry
         elif entry_flag == "Unfavorable":
-            score -= 20
+            score = max(0, score - 15)   # Penalty for unfavorable entry
         
         return max(0, min(100, score))
     
@@ -414,14 +413,16 @@ class StockEvaluator:
             return f"{ticker} has limited data for comprehensive analysis."
     
     def _get_recommendation(self, total_score: float) -> str:
-        """Get recommendation based on total score."""
-        if total_score >= 75:
+        """Get recommendation based on standardized total score thresholds."""
+        # Standardized recommendation tiers:
+        # Strong Buy ≥ 70, Buy 60-69, Hold 50-59, Weak Hold 40-49, Avoid < 40
+        if total_score >= 70:
             return "Strong Buy"
         elif total_score >= 60:
             return "Buy"
-        elif total_score >= 45:
+        elif total_score >= 50:
             return "Hold"
-        elif total_score >= 30:
+        elif total_score >= 40:
             return "Weak Hold"
         else:
             return "Avoid"
