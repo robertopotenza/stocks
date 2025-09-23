@@ -114,6 +114,103 @@ def load_tickers_from_excel(file_path: str) -> List[str]:
         return []
 
 
+def calculate_financial_metrics(stock_data: Dict[str, Any]) -> None:
+    """
+    Calculate additional financial metrics based on existing data
+    
+    Args:
+        stock_data: Dictionary containing stock data (modified in place)
+    """
+    try:
+        price = stock_data.get('Price')
+        high_52w = stock_data.get('52w_High')
+        low_52w = stock_data.get('52w_Low')
+        pe_ratio = stock_data.get('PE_Ratio')
+        recent_support = stock_data.get('Recent_Support')
+        recent_resistance = stock_data.get('Recent_Resistance')
+        pivot_support_1 = stock_data.get('Pivot_Support_1')
+        pivot_resistance_1 = stock_data.get('Pivot_Resistance_1')
+        
+        # Only calculate if we have valid price data
+        if not isinstance(price, (int, float)) or price <= 0:
+            return
+        
+        # 1. Risk/Reward Ratio (based on recent support/resistance)
+        if (isinstance(recent_support, (int, float)) and isinstance(recent_resistance, (int, float)) and
+            recent_support > 0 and recent_resistance > price):
+            risk = price - recent_support
+            reward = recent_resistance - price
+            if risk > 0:
+                stock_data['Risk_Reward_Ratio'] = round(reward / risk, 2)
+        
+        # 2. Distance from 52-Week High/Low (%)
+        if isinstance(high_52w, (int, float)) and high_52w > 0:
+            distance_from_high = ((high_52w - price) / high_52w) * 100
+            stock_data['Distance_from_52w_High_Pct'] = round(distance_from_high, 2)
+        
+        if isinstance(low_52w, (int, float)) and low_52w > 0:
+            distance_from_low = ((price - low_52w) / low_52w) * 100
+            stock_data['Distance_from_52w_Low_Pct'] = round(distance_from_low, 2)
+        
+        # 3. Upside/Downside Potential (based on pivot levels)
+        if isinstance(pivot_resistance_1, (int, float)) and pivot_resistance_1 > price:
+            upside_potential = ((pivot_resistance_1 - price) / price) * 100
+            stock_data['Upside_Potential_Pct'] = round(upside_potential, 2)
+        
+        if isinstance(pivot_support_1, (int, float)) and pivot_support_1 > 0 and pivot_support_1 < price:
+            downside_risk = ((price - pivot_support_1) / price) * 100
+            stock_data['Downside_Risk_Pct'] = round(downside_risk, 2)
+        
+        # 4. PEG Ratio (would need EPS growth rate - setting to N/A for now as we don't have this data)
+        # This would require additional API calls to get earnings growth data
+        stock_data['PEG_Ratio'] = 'N/A'
+        
+        # 5. Valuation Flags
+        valuation_flags = []
+        entry_flags = []
+        price_level_flags = []
+        
+        # Valuation based on PE ratio
+        if isinstance(pe_ratio, (int, float)):
+            if pe_ratio < 20:
+                valuation_flags.append("Undervalued")
+            elif pe_ratio > 30:
+                valuation_flags.append("Overvalued")
+            else:
+                valuation_flags.append("Fair Value")
+        
+        # Entry opportunity based on risk/reward ratio
+        risk_reward = stock_data.get('Risk_Reward_Ratio')
+        if isinstance(risk_reward, (int, float)):
+            if risk_reward > 2:
+                entry_flags.append("Favorable")
+            elif risk_reward < 1:
+                entry_flags.append("Unfavorable")
+            else:
+                entry_flags.append("Neutral")
+        else:
+            entry_flags.append("N/A")
+        
+        # Price level based on distance from 52w high
+        distance_from_high = stock_data.get('Distance_from_52w_High_Pct')
+        if isinstance(distance_from_high, (int, float)):
+            if distance_from_high < 5:
+                price_level_flags.append("Near Top")
+            elif distance_from_high > 50:
+                price_level_flags.append("Near Bottom")
+            else:
+                price_level_flags.append("Mid Range")
+        
+        # Set flag values
+        stock_data['Valuation_Flag'] = valuation_flags[0] if valuation_flags else 'N/A'
+        stock_data['Entry_Opportunity_Flag'] = entry_flags[0] if entry_flags else 'N/A'
+        stock_data['Price_Level_Flag'] = price_level_flags[0] if price_level_flags else 'N/A'
+        
+    except Exception as e:
+        logger.error(f"Error calculating financial metrics: {e}")
+        # Keep default 'N/A' values
+
+
 def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
     """
     Fetch comprehensive stock data for given tickers
@@ -142,7 +239,16 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
             'Pivot_Resistance_1': 'N/A',
             'Pivot_Resistance_2': 'N/A',
             'Recent_Support': 'N/A',
-            'Recent_Resistance': 'N/A'
+            'Recent_Resistance': 'N/A',
+            'Risk_Reward_Ratio': 'N/A',
+            'Distance_from_52w_High_Pct': 'N/A',
+            'Distance_from_52w_Low_Pct': 'N/A',
+            'Upside_Potential_Pct': 'N/A',
+            'Downside_Risk_Pct': 'N/A',
+            'PEG_Ratio': 'N/A',
+            'Valuation_Flag': 'N/A',
+            'Entry_Opportunity_Flag': 'N/A',
+            'Price_Level_Flag': 'N/A'
         }
         
         try:
@@ -214,6 +320,10 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
                 logger.warning(f"{i}/{total_tickers} {ticker}: Technical levels calculation returned invalid data: {type(technical_levels)}")
                 # Keep default 'N/A' values already set in stock_data
             
+            # Calculate additional financial metrics
+            logger.debug(f"{i}/{total_tickers} {ticker}: Calculating financial metrics...")
+            calculate_financial_metrics(stock_data)
+            
             results[ticker] = stock_data
             logger.info(f"{i}/{total_tickers} {ticker}: ${stock_data['Price']} | "
                        f"Sup: {stock_data['Pivot_Support_1']} | Res: {stock_data['Pivot_Resistance_1']}")
@@ -231,7 +341,16 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
                 'Pivot_Resistance_1': 'N/A',
                 'Pivot_Resistance_2': 'N/A',
                 'Recent_Support': 'N/A',
-                'Recent_Resistance': 'N/A'
+                'Recent_Resistance': 'N/A',
+                'Risk_Reward_Ratio': 'N/A',
+                'Distance_from_52w_High_Pct': 'N/A',
+                'Distance_from_52w_Low_Pct': 'N/A',
+                'Upside_Potential_Pct': 'N/A',
+                'Downside_Risk_Pct': 'N/A',
+                'PEG_Ratio': 'N/A',
+                'Valuation_Flag': 'N/A',
+                'Entry_Opportunity_Flag': 'N/A',
+                'Price_Level_Flag': 'N/A'
             }
             logger.warning(f"{i}/{total_tickers} {ticker}: {error_msg}")
     
@@ -282,7 +401,16 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
                 'Pivot_Resistance_1': stock_data.get('Pivot_Resistance_1', 'N/A'),
                 'Pivot_Resistance_2': stock_data.get('Pivot_Resistance_2', 'N/A'),
                 'Recent_Support': stock_data.get('Recent_Support', 'N/A'),
-                'Recent_Resistance': stock_data.get('Recent_Resistance', 'N/A')
+                'Recent_Resistance': stock_data.get('Recent_Resistance', 'N/A'),
+                'Risk_Reward_Ratio': stock_data.get('Risk_Reward_Ratio', 'N/A'),
+                'Distance_from_52w_High_Pct': stock_data.get('Distance_from_52w_High_Pct', 'N/A'),
+                'Distance_from_52w_Low_Pct': stock_data.get('Distance_from_52w_Low_Pct', 'N/A'),
+                'Upside_Potential_Pct': stock_data.get('Upside_Potential_Pct', 'N/A'),
+                'Downside_Risk_Pct': stock_data.get('Downside_Risk_Pct', 'N/A'),
+                'PEG_Ratio': stock_data.get('PEG_Ratio', 'N/A'),
+                'Valuation_Flag': stock_data.get('Valuation_Flag', 'N/A'),
+                'Entry_Opportunity_Flag': stock_data.get('Entry_Opportunity_Flag', 'N/A'),
+                'Price_Level_Flag': stock_data.get('Price_Level_Flag', 'N/A')
             }
             data_rows.append(row)
         
@@ -308,6 +436,12 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
             pivot_res1 = row['Pivot_Resistance_1']
             recent_sup = row['Recent_Support']
             recent_res = row['Recent_Resistance']
+            risk_reward = row['Risk_Reward_Ratio']
+            dist_high = row['Distance_from_52w_High_Pct']
+            dist_low = row['Distance_from_52w_Low_Pct']
+            valuation = row['Valuation_Flag']
+            entry_opp = row['Entry_Opportunity_Flag']
+            price_level = row['Price_Level_Flag']
             
             if isinstance(price, (int, float)):
                 logger.info(f"{ticker:>8}: ${safe_format_price(price)} | "
@@ -315,7 +449,10 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
                            f"Cap: {safe_format_number(market_cap, '>12.0f')} | "
                            f"P/E: {safe_format_number(pe_ratio, '>6.2f')}")
                 logger.info(f"{'':>8}  Pivot S/R: {safe_format_number(pivot_sup1, '.2f')}-{safe_format_number(pivot_res1, '.2f')} | "
-                           f"Recent S/R: {safe_format_number(recent_sup, '.2f')}-{safe_format_number(recent_res, '.2f')}")
+                           f"Recent S/R: {safe_format_number(recent_sup, '.2f')}-{safe_format_number(recent_res, '.2f')} | "
+                           f"R/R: {safe_format_number(risk_reward, '.2f')}")
+                logger.info(f"{'':>8}  52w Dist: H{safe_format_number(dist_high, '.1f')}% L{safe_format_number(dist_low, '.1f')}% | "
+                           f"Val: {valuation} | Entry: {entry_opp} | Level: {price_level}")
             else:
                 logger.info(f"{ticker:>8}: {str(price):>12} | Data: N/A")
         
