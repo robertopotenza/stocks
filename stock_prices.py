@@ -12,6 +12,7 @@ import robin_stocks.robinhood as r
 import pandas as pd
 import os
 from typing import Dict, List, Any
+from technical_analysis import calculate_technical_levels
 
 # Configuration variables - can be set via environment variables or modified here
 USERNAME = os.getenv("ROBINHOOD_USERNAME", "your_email")
@@ -83,7 +84,7 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
         
     Returns:
         Dictionary mapping ticker to stock data dictionary containing:
-        Price, 52w_High, 52w_Low, MarketCap, PE_Ratio
+        Price, 52w_High, 52w_Low, MarketCap, PE_Ratio, and Technical Levels
     """
     results = {}
     total_tickers = len(tickers)
@@ -96,7 +97,13 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
             '52w_High': 'N/A', 
             '52w_Low': 'N/A',
             'MarketCap': 'N/A',
-            'PE_Ratio': 'N/A'
+            'PE_Ratio': 'N/A',
+            'Pivot_Support_1': 'N/A',
+            'Pivot_Support_2': 'N/A',
+            'Pivot_Resistance_1': 'N/A',
+            'Pivot_Resistance_2': 'N/A',
+            'Recent_Support': 'N/A',
+            'Recent_Resistance': 'N/A'
         }
         
         try:
@@ -132,8 +139,23 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
                 if pe_ratio:
                     stock_data['PE_Ratio'] = float(pe_ratio)
             
+            # Calculate technical levels (Support & Resistance)
+            print(f"  {i}/{total_tickers} {ticker}: Calculating technical levels...")
+            technical_levels = calculate_technical_levels(ticker)
+            
+            # Add technical analysis results
+            stock_data.update({
+                'Pivot_Support_1': technical_levels.get('pivot_support_1', 'N/A'),
+                'Pivot_Support_2': technical_levels.get('pivot_support_2', 'N/A'),
+                'Pivot_Resistance_1': technical_levels.get('pivot_resistance_1', 'N/A'),
+                'Pivot_Resistance_2': technical_levels.get('pivot_resistance_2', 'N/A'),
+                'Recent_Support': technical_levels.get('recent_support', 'N/A'),
+                'Recent_Resistance': technical_levels.get('recent_resistance', 'N/A')
+            })
+            
             results[ticker] = stock_data
-            print(f"  {i}/{total_tickers} {ticker}: ${stock_data['Price']}")
+            print(f"  {i}/{total_tickers} {ticker}: ${stock_data['Price']} | "
+                  f"Sup: {stock_data['Pivot_Support_1']} | Res: {stock_data['Pivot_Resistance_1']}")
             
         except Exception as e:
             error_msg = f"Error: {e}"
@@ -142,7 +164,13 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
                 '52w_High': 'N/A',
                 '52w_Low': 'N/A', 
                 'MarketCap': 'N/A',
-                'PE_Ratio': 'N/A'
+                'PE_Ratio': 'N/A',
+                'Pivot_Support_1': 'N/A',
+                'Pivot_Support_2': 'N/A',
+                'Pivot_Resistance_1': 'N/A',
+                'Pivot_Resistance_2': 'N/A',
+                'Recent_Support': 'N/A',
+                'Recent_Resistance': 'N/A'
             }
             print(f"  {i}/{total_tickers} {ticker}: {error_msg}")
     
@@ -169,7 +197,13 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
                 '52w_High': stock_data.get('52w_High', 'N/A'),
                 '52w_Low': stock_data.get('52w_Low', 'N/A'),
                 'MarketCap': stock_data.get('MarketCap', 'N/A'),
-                'PE_Ratio': stock_data.get('PE_Ratio', 'N/A')
+                'PE_Ratio': stock_data.get('PE_Ratio', 'N/A'),
+                'Pivot_Support_1': stock_data.get('Pivot_Support_1', 'N/A'),
+                'Pivot_Support_2': stock_data.get('Pivot_Support_2', 'N/A'),
+                'Pivot_Resistance_1': stock_data.get('Pivot_Resistance_1', 'N/A'),
+                'Pivot_Resistance_2': stock_data.get('Pivot_Resistance_2', 'N/A'),
+                'Recent_Support': stock_data.get('Recent_Support', 'N/A'),
+                'Recent_Resistance': stock_data.get('Recent_Resistance', 'N/A')
             }
             data_rows.append(row)
         
@@ -192,10 +226,16 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
             low_52w = row['52w_Low']
             market_cap = row['MarketCap']
             pe_ratio = row['PE_Ratio']
+            pivot_sup1 = row['Pivot_Support_1']
+            pivot_res1 = row['Pivot_Resistance_1']
+            recent_sup = row['Recent_Support']
+            recent_res = row['Recent_Resistance']
             
             if isinstance(price, (int, float)):
                 print(f"{ticker:>8}: ${price:>10.2f} | 52w: ${high_52w:>8.2f}-${low_52w:>8.2f} | "
                       f"Cap: {market_cap:>12.0f} | P/E: {pe_ratio:>6.2f}")
+                print(f"{'':>8}  Pivot S/R: ${pivot_sup1}-${pivot_res1} | "
+                      f"Recent S/R: ${recent_sup}-${recent_res}")
             else:
                 print(f"{ticker:>8}: {str(price):>12} | Data: N/A")
         
