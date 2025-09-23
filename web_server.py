@@ -29,6 +29,61 @@ job_status = {
     'run_count': 0
 }
 
+# HTML template for browser users
+HTML_TEMPLATE = '''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Data Fetcher</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
+        .header { background: #f4f4f4; padding: 20px; border-radius: 5px; margin-bottom: 20px; }
+        .status { background: #e8f5e8; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .endpoints { background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 15px 0; }
+        .button { display: inline-block; background: #007bff; color: white; padding: 10px 20px; 
+                  text-decoration: none; border-radius: 3px; margin: 5px 0; }
+        .button:hover { background: #0056b3; }
+        .timestamp { color: #666; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 Stock Data Fetcher</h1>
+        <p>Web interface for the Robinhood stock data fetching service</p>
+    </div>
+    
+    <div class="status">
+        <h2>Service Status</h2>
+        <p><strong>Status:</strong> SERVICE_STATUS_PLACEHOLDER</p>
+        <p><strong>Service:</strong> SERVICE_NAME_PLACEHOLDER</p>
+        <p><strong>Job Status:</strong> JOB_STATUS_PLACEHOLDER</p>
+        <p><strong>Run Count:</strong> RUN_COUNT_PLACEHOLDER</p>
+        LAST_RUN_PLACEHOLDER
+        LAST_ERROR_PLACEHOLDER
+        <p class="timestamp">Last updated: TIMESTAMP_PLACEHOLDER</p>
+    </div>
+    
+    <div class="endpoints">
+        <h2>Available Actions</h2>
+        <p><a href="/run" class="button">🚀 Start Stock Fetching Job</a></p>
+        <p><a href="/status" class="button">📊 View Job Status</a></p>
+        <p><a href="/logs" class="button">📝 View Logs</a></p>
+    </div>
+    
+    <div class="endpoints">
+        <h2>API Endpoints</h2>
+        <ul>
+            <li><strong>GET /</strong> - Health check (this page for browsers, JSON for API clients)</li>
+            <li><strong>GET /run</strong> - Trigger stock data fetching job</li>
+            <li><strong>GET /status</strong> - Get current job status</li>
+            <li><strong>GET /logs</strong> - View last job output</li>
+            <li><strong>GET /favicon.ico</strong> - Favicon handler</li>
+        </ul>
+    </div>
+</body>
+</html>'''
+
 def run_stock_fetcher_async():
     """Run the stock fetcher in a background thread."""
     try:
@@ -60,14 +115,42 @@ def run_stock_fetcher_async():
 
 @app.route('/')
 def health_check():
-    """Health check endpoint for load balancers."""
+    """Health check endpoint - serves HTML for browsers, JSON for API clients."""
     logger.debug("Health check endpoint accessed")
-    return jsonify({
+    
+    # Prepare the data
+    data = {
         'status': 'healthy',
         'service': 'Stock Data Fetcher',
         'timestamp': datetime.now().isoformat(),
         'job_status': job_status
-    })
+    }
+    
+    # Check if the request wants HTML (browser) or JSON (API client)
+    accept_header = request.headers.get('Accept', '')
+    if 'text/html' in accept_header and 'application/json' not in accept_header:
+        # Browser request - serve HTML with simple string replacement
+        html = HTML_TEMPLATE.replace('SERVICE_STATUS_PLACEHOLDER', data['status'])
+        html = html.replace('SERVICE_NAME_PLACEHOLDER', data['service'])
+        html = html.replace('TIMESTAMP_PLACEHOLDER', data['timestamp'])
+        html = html.replace('JOB_STATUS_PLACEHOLDER', data['job_status']['status'])
+        html = html.replace('RUN_COUNT_PLACEHOLDER', str(data['job_status']['run_count']))
+        
+        # Handle optional fields
+        if data['job_status']['last_run']:
+            html = html.replace('LAST_RUN_PLACEHOLDER', f'<p><strong>Last Run:</strong> {data["job_status"]["last_run"]}</p>')
+        else:
+            html = html.replace('LAST_RUN_PLACEHOLDER', '')
+        
+        if data['job_status']['last_error']:
+            html = html.replace('LAST_ERROR_PLACEHOLDER', f'<p><strong>Last Error:</strong> {data["job_status"]["last_error"]}</p>')
+        else:
+            html = html.replace('LAST_ERROR_PLACEHOLDER', '')
+            
+        return html, 200, {'Content-Type': 'text/html'}
+    else:
+        # API request - serve JSON
+        return jsonify(data)
 
 @app.route('/favicon.ico')
 def favicon():
