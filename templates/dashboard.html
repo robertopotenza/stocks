@@ -146,6 +146,115 @@
             </div>
         </div>
 
+        <!-- AI Evaluation Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-robot me-2"></i>AI Stock Evaluation
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-success me-2" onclick="runDemoEvaluation()">
+                                <i class="fas fa-play"></i> Demo
+                            </button>
+                            <button class="btn btn-sm btn-outline-info me-2" onclick="runQuickEvaluation()">
+                                <i class="fas fa-zap"></i> Quick Eval
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="runAIEvaluation()">
+                                <i class="fas fa-brain"></i> Run AI Analysis
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="ai-evaluation-loading" class="text-center py-4" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div class="mt-2">Running AI analysis...</div>
+                        </div>
+                        
+                        <!-- AI Summary Section -->
+                        <div id="ai-summary-section" style="display: none;">
+                            <div class="row mb-4">
+                                <div class="col-md-3">
+                                    <div class="card bg-success text-white">
+                                        <div class="card-body text-center">
+                                            <h3 id="strong-buys-count">0</h3>
+                                            <small>Strong Buys</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-primary text-white">
+                                        <div class="card-body text-center">
+                                            <h3 id="buys-count">0</h3>
+                                            <small>Buys</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-warning text-dark">
+                                        <div class="card-body text-center">
+                                            <h3 id="holds-count">0</h3>
+                                            <small>Holds</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-danger text-white">
+                                        <div class="card-body text-center">
+                                            <h3 id="avoids-count">0</h3>
+                                            <small>Avoids</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="alert alert-info">
+                                <h6><i class="fas fa-trophy me-2"></i>Top Pick</h6>
+                                <span id="top-pick-info">No evaluation available</span>
+                            </div>
+                        </div>
+                        
+                        <!-- AI Rankings Table -->
+                        <div id="ai-rankings-container" style="display: none;">
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover" id="ai-rankings-table">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Rank</th>
+                                            <th>Ticker</th>
+                                            <th>Score</th>
+                                            <th>Recommendation</th>
+                                            <th>Price</th>
+                                            <th>P/E</th>
+                                            <th>Risk/Reward</th>
+                                            <th>AI Commentary</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="ai-rankings-tbody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div id="ai-evaluation-placeholder" class="text-center text-muted py-4">
+                            <i class="fas fa-robot fa-3x mb-3"></i>
+                            <p>Click "Demo" to see sample AI analysis, or "Run AI Analysis" to analyze your current stock data.</p>
+                            <p class="small">The AI evaluates stocks based on technical analysis, valuation metrics, and risk-reward ratios, then ranks them from most to least attractive with plain English explanations.</p>
+                        </div>
+                        
+                        <!-- AI Results Display -->
+                        <div id="ai-results" class="mt-4" style="display: none;">
+                            <h6><i class="fas fa-robot me-2"></i>AI Analysis Results</h6>
+                            <div id="ai-results-content"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Logs Section -->
         <div class="row mt-4">
             <div class="col-12">

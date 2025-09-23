@@ -14,7 +14,8 @@ import time
 from datetime import datetime
 from flask import Flask, jsonify, request, render_template, send_file
 import pandas as pd
-from stock_prices import main as run_stock_fetcher
+from stock_prices import main as run_stock_fetcher, fetch_stock_data, load_tickers_from_excel
+from ai_evaluation import evaluate_stock_portfolio
 from logging_config import setup_logging, get_web_logs, clear_web_logs, get_logger
 
 # Setup logging with web capture enabled
@@ -241,6 +242,254 @@ def download_excel():
     except Exception as e:
         logger.error(f"Error downloading Excel file: {e}")
         return jsonify({'error': f'Failed to download Excel file: {str(e)}'}), 500
+
+@app.route('/ai-evaluation')
+def get_ai_evaluation():
+    """Get AI-powered stock evaluation and rankings."""
+    logger.debug("AI evaluation endpoint accessed")
+    
+    try:
+        # Load current stock data from Excel file
+        if not os.path.exists(TICKERS_FILE):
+            return jsonify({
+                'error': 'No stock data available for evaluation. Run stock fetch job first.'
+            }), 404
+        
+        # Read the Excel file to get stock data
+        df = pd.read_excel(TICKERS_FILE)
+        
+        # Check if we have the required columns for evaluation
+        required_columns = ['Ticker', 'Price', 'PE_Ratio']
+        if not all(col in df.columns for col in required_columns):
+            return jsonify({
+                'error': 'Stock data is incomplete. Run stock fetch job to get latest data.'
+            }), 400
+        
+        # Convert DataFrame to the format expected by AI evaluation
+        stock_data = {}
+        for _, row in df.iterrows():
+            ticker = row['Ticker']
+            # Convert row to dictionary, handling NaN values
+            data = {}
+            for col in df.columns:
+                value = row[col]
+                if pd.isna(value):
+                    data[col] = 'N/A'
+                else:
+                    data[col] = value
+            stock_data[ticker] = data
+        
+        # Run AI evaluation
+        logger.info(f"Running AI evaluation on {len(stock_data)} stocks")
+        evaluation_result = evaluate_stock_portfolio(stock_data)
+        
+        logger.info(f"AI evaluation completed. Top pick: {evaluation_result['summary'].get('top_pick', 'None')}")
+        
+        return jsonify(evaluation_result)
+        
+    except Exception as e:
+        logger.error(f"Error in AI evaluation: {e}")
+        return jsonify({'error': f'Failed to perform AI evaluation: {str(e)}'}), 500
+
+@app.route('/quick-evaluation')
+def get_quick_evaluation():
+    """Get a quick AI evaluation using live data (without full stock fetch)."""
+    logger.debug("Quick evaluation endpoint accessed")
+    
+    try:
+        # Load tickers from Excel file
+        if not os.path.exists(TICKERS_FILE):
+            return jsonify({
+                'error': 'No tickers file found. Please add some tickers first.'
+            }), 404
+        
+        # Check if credentials are available for quick fetch
+        username = os.getenv("ROBINHOOD_USERNAME", "your_email")
+        password = os.getenv("ROBINHOOD_PASSWORD", "your_password") 
+        
+        if username == "your_email" or password == "your_password":
+            return jsonify({
+                'error': 'Robinhood credentials not configured for quick evaluation.'
+            }), 400
+        
+        # Load tickers
+        tickers = load_tickers_from_excel(TICKERS_FILE)
+        if not tickers:
+            return jsonify({
+                'error': 'No valid tickers found in file.'
+            }), 400
+        
+        # Limit to first 10 tickers for quick evaluation
+        limited_tickers = tickers[:10]
+        logger.info(f"Running quick evaluation on {len(limited_tickers)} tickers")
+        
+        # Fetch fresh stock data
+        stock_data = fetch_stock_data(limited_tickers)
+        
+        if not stock_data:
+            return jsonify({
+                'error': 'Failed to fetch stock data for evaluation.'
+            }), 500
+        
+        # Run AI evaluation
+        evaluation_result = evaluate_stock_portfolio(stock_data)
+        
+        logger.info(f"Quick AI evaluation completed. Top pick: {evaluation_result['summary'].get('top_pick', 'None')}")
+        
+        return jsonify(evaluation_result)
+        
+    except Exception as e:
+        logger.error(f"Error in quick evaluation: {e}")
+        return jsonify({'error': f'Failed to perform quick evaluation: {str(e)}'}), 500
+
+@app.route('/demo-evaluation')
+def get_demo_evaluation():
+    """Get a demo AI evaluation using sample data for testing."""
+    logger.debug("Demo evaluation endpoint accessed")
+    
+    try:
+        # Create sample stock data for demonstration
+        sample_data = {
+            'AAPL': {
+                'Price': 175.25,
+                '52w_High': 199.62,
+                '52w_Low': 124.17,
+                'MarketCap': 2750000000000,
+                'PE_Ratio': 28.5,
+                'Pivot_Support_1': 172.50,
+                'Pivot_Support_2': 168.75,
+                'Pivot_Resistance_1': 178.40,
+                'Pivot_Resistance_2': 182.15,
+                'Recent_Support': 170.25,
+                'Recent_Resistance': 180.60,
+                'Risk_Reward_Ratio': 2.3,
+                'Distance_from_52w_High_Pct': 12.2,
+                'Distance_from_52w_Low_Pct': 41.1,
+                'Upside_Potential_Pct': 18.5,
+                'Downside_Risk_Pct': 8.2,
+                'Valuation_Flag': 'Fair Value',
+                'Entry_Opportunity_Flag': 'Favorable',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'GOOGL': {
+                'Price': 2785.50,
+                '52w_High': 3030.93,
+                '52w_Low': 2193.62,
+                'MarketCap': 1850000000000,
+                'PE_Ratio': 24.8,
+                'Pivot_Support_1': 2750.25,
+                'Pivot_Support_2': 2690.80,
+                'Pivot_Resistance_1': 2820.75,
+                'Pivot_Resistance_2': 2880.40,
+                'Recent_Support': 2765.30,
+                'Recent_Resistance': 2810.90,
+                'Risk_Reward_Ratio': 1.8,
+                'Distance_from_52w_High_Pct': 8.1,
+                'Distance_from_52w_Low_Pct': 27.0,
+                'Upside_Potential_Pct': 12.8,
+                'Downside_Risk_Pct': 7.1,
+                'Valuation_Flag': 'Fair Value',
+                'Entry_Opportunity_Flag': 'Neutral',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'TSLA': {
+                'Price': 245.80,
+                '52w_High': 299.29,
+                '52w_Low': 138.80,
+                'MarketCap': 780000000000,
+                'PE_Ratio': 65.2,
+                'Pivot_Support_1': 235.60,
+                'Pivot_Support_2': 220.45,
+                'Pivot_Resistance_1': 260.25,
+                'Pivot_Resistance_2': 275.80,
+                'Recent_Support': 240.15,
+                'Recent_Resistance': 255.70,
+                'Risk_Reward_Ratio': 1.2,
+                'Distance_from_52w_High_Pct': 17.9,
+                'Distance_from_52w_Low_Pct': 77.1,
+                'Upside_Potential_Pct': 9.5,
+                'Downside_Risk_Pct': 8.1,
+                'Valuation_Flag': 'Overvalued',
+                'Entry_Opportunity_Flag': 'Unfavorable',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'NVDA': {
+                'Price': 118.75,
+                '52w_High': 140.76,
+                '52w_Low': 39.23,
+                'MarketCap': 2920000000000,
+                'PE_Ratio': 32.8,
+                'Pivot_Support_1': 115.20,
+                'Pivot_Support_2': 108.45,
+                'Pivot_Resistance_1': 125.30,
+                'Pivot_Resistance_2': 132.85,
+                'Recent_Support': 112.60,
+                'Recent_Resistance': 128.90,
+                'Risk_Reward_Ratio': 3.1,
+                'Distance_from_52w_High_Pct': 15.6,
+                'Distance_from_52w_Low_Pct': 202.6,
+                'Upside_Potential_Pct': 22.4,
+                'Downside_Risk_Pct': 7.2,
+                'Valuation_Flag': 'Overvalued',
+                'Entry_Opportunity_Flag': 'Favorable',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'MSFT': {
+                'Price': 415.30,
+                '52w_High': 468.35,
+                '52w_Low': 309.45,
+                'MarketCap': 3080000000000,
+                'PE_Ratio': 34.2,
+                'Pivot_Support_1': 405.85,
+                'Pivot_Support_2': 395.20,
+                'Pivot_Resistance_1': 425.75,
+                'Pivot_Resistance_2': 435.80,
+                'Recent_Support': 408.90,
+                'Recent_Resistance': 422.15,
+                'Risk_Reward_Ratio': 1.6,
+                'Distance_from_52w_High_Pct': 11.3,
+                'Distance_from_52w_Low_Pct': 34.2,
+                'Upside_Potential_Pct': 8.5,
+                'Downside_Risk_Pct': 5.3,
+                'Valuation_Flag': 'Overvalued',
+                'Entry_Opportunity_Flag': 'Neutral',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'META': {
+                'Price': 485.20,
+                '52w_High': 542.81,
+                '52w_Low': 279.70,
+                'MarketCap': 1240000000000,
+                'PE_Ratio': 22.1,
+                'Pivot_Support_1': 475.40,
+                'Pivot_Support_2': 465.85,
+                'Pivot_Resistance_1': 495.60,
+                'Pivot_Resistance_2': 510.25,
+                'Recent_Support': 478.30,
+                'Recent_Resistance': 492.80,
+                'Risk_Reward_Ratio': 2.8,
+                'Distance_from_52w_High_Pct': 10.6,
+                'Distance_from_52w_Low_Pct': 73.5,
+                'Upside_Potential_Pct': 16.2,
+                'Downside_Risk_Pct': 5.8,
+                'Valuation_Flag': 'Fair Value',
+                'Entry_Opportunity_Flag': 'Favorable',
+                'Price_Level_Flag': 'Mid Range'
+            }
+        }
+        
+        logger.info("Running demo AI evaluation with sample data")
+        
+        # Run AI evaluation on sample data
+        evaluation_result = evaluate_stock_portfolio(sample_data)
+        
+        logger.info(f"Demo AI evaluation completed. Top pick: {evaluation_result['summary'].get('top_pick', 'None')}")
+        
+        return jsonify(evaluation_result)
+        
+    except Exception as e:
+        logger.error(f"Error in demo evaluation: {e}")
+        return jsonify({'error': f'Failed to perform demo evaluation: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # Get port from environment (Railway, Heroku, etc.)

@@ -444,3 +444,270 @@ document.addEventListener('DOMContentLoaded', function() {
 window.addEventListener('beforeunload', function() {
     stopStatusUpdates();
 });
+
+// AI Evaluation Functions
+
+// Run AI evaluation using existing stock data
+async function runAIEvaluation() {
+    const loadingElement = document.getElementById('ai-evaluation-loading');
+    const placeholderElement = document.getElementById('ai-evaluation-placeholder');
+    const summarySection = document.getElementById('ai-summary-section');
+    const rankingsContainer = document.getElementById('ai-rankings-container');
+    
+    try {
+        // Show loading state
+        loadingElement.style.display = 'block';
+        placeholderElement.style.display = 'none';
+        summarySection.style.display = 'none';
+        rankingsContainer.style.display = 'none';
+        
+        showSuccess('Running AI analysis on current stock data...');
+        
+        const response = await fetch('/ai-evaluation');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Display results
+        displayAIEvaluation(data);
+        showSuccess('AI analysis completed successfully!');
+        
+    } catch (error) {
+        console.error('Error running AI evaluation:', error);
+        showError('AI evaluation failed: ' + error.message);
+        
+        // Hide loading and show placeholder
+        loadingElement.style.display = 'none';
+        placeholderElement.style.display = 'block';
+        
+    } finally {
+        loadingElement.style.display = 'none';
+    }
+}
+
+// Run quick AI evaluation with fresh data
+async function runQuickEvaluation() {
+    const loadingElement = document.getElementById('ai-evaluation-loading');
+    const placeholderElement = document.getElementById('ai-evaluation-placeholder');
+    const summarySection = document.getElementById('ai-summary-section');
+    const rankingsContainer = document.getElementById('ai-rankings-container');
+    
+    try {
+        // Show loading state
+        loadingElement.style.display = 'block';
+        placeholderElement.style.display = 'none';
+        summarySection.style.display = 'none';
+        rankingsContainer.style.display = 'none';
+        
+        showSuccess('Running quick AI evaluation with fresh data...');
+        
+        const response = await fetch('/quick-evaluation');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Display results
+        displayAIEvaluation(data);
+        showSuccess('Quick AI evaluation completed!');
+        
+    } catch (error) {
+        console.error('Error running quick evaluation:', error);
+        showError('Quick evaluation failed: ' + error.message);
+        
+        // Hide loading and show placeholder
+        loadingElement.style.display = 'none';
+        placeholderElement.style.display = 'block';
+        
+    } finally {
+        loadingElement.style.display = 'none';
+    }
+}
+
+// Run demo AI evaluation with sample data
+async function runDemoEvaluation() {
+    const loadingElement = document.getElementById('ai-evaluation-loading');
+    const placeholderElement = document.getElementById('ai-evaluation-placeholder');
+    const summarySection = document.getElementById('ai-summary-section');
+    const rankingsContainer = document.getElementById('ai-rankings-container');
+    
+    try {
+        // Show loading state
+        if (loadingElement) loadingElement.style.display = 'block';
+        if (placeholderElement) placeholderElement.style.display = 'none';
+        if (summarySection) summarySection.style.display = 'none';
+        if (rankingsContainer) rankingsContainer.style.display = 'none';
+        
+        showSuccess('Running demo AI evaluation with sample data...');
+        
+        const response = await fetch('/demo-evaluation');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Display results
+        displayAIEvaluation(data);
+        showSuccess('Demo AI evaluation completed! This shows how the AI analyzes real stock data.');
+        
+    } catch (error) {
+        console.error('Error running demo evaluation:', error);
+        showError('Demo evaluation failed: ' + error.message);
+        
+        // Hide loading and show placeholder
+        if (loadingElement) loadingElement.style.display = 'none';
+        if (placeholderElement) placeholderElement.style.display = 'block';
+        
+    } finally {
+        if (loadingElement) loadingElement.style.display = 'none';
+    }
+}
+
+// Display AI evaluation results
+function displayAIEvaluation(data) {
+    const summarySection = document.getElementById('ai-summary-section');
+    const rankingsContainer = document.getElementById('ai-rankings-container');
+    const placeholderElement = document.getElementById('ai-evaluation-placeholder');
+    
+    // Hide placeholder
+    if (placeholderElement) {
+        placeholderElement.style.display = 'none';
+    }
+    
+    // Update summary counts
+    const strongBuysCount = document.getElementById('strong-buys-count');
+    const buysCount = document.getElementById('buys-count');
+    const holdsCount = document.getElementById('holds-count');
+    const avoidsCount = document.getElementById('avoids-count');
+    
+    if (strongBuysCount) strongBuysCount.textContent = data.summary.strong_buys || 0;
+    if (buysCount) buysCount.textContent = data.summary.buys || 0;
+    if (holdsCount) holdsCount.textContent = data.summary.holds || 0;
+    if (avoidsCount) avoidsCount.textContent = (data.summary.avoids || 0) + (data.summary.weak_holds || 0);
+    
+    // Update top pick
+    const topPickInfo = document.getElementById('top-pick-info');
+    if (topPickInfo) {
+        if (data.summary.top_pick && data.ranked_stocks.length > 0) {
+            const topStock = data.ranked_stocks[0];
+            topPickInfo.innerHTML = `
+                <strong>${topStock.ticker}</strong> with score ${topStock.total_score}/100 
+                (${topStock.recommendation}) - ${topStock.commentary}
+            `;
+        } else {
+            topPickInfo.textContent = 'No stocks available for evaluation';
+        }
+    }
+    
+    // Show summary section
+    if (summarySection) {
+        summarySection.style.display = 'block';
+    }
+    
+    // Populate rankings table
+    const tbody = document.getElementById('ai-rankings-tbody');
+    if (tbody && data.ranked_stocks && data.ranked_stocks.length > 0) {
+        tbody.innerHTML = data.ranked_stocks.map((stock, index) => `
+            <tr class="${getRecommendationRowClass(stock.recommendation)}">
+                <td class="fw-bold">${index + 1}</td>
+                <td class="fw-bold">${stock.ticker}</td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <span class="fw-bold me-2">${stock.total_score}</span>
+                        <div class="progress flex-grow-1" style="height: 6px;">
+                            <div class="progress-bar ${getScoreProgressClass(stock.total_score)}" 
+                                 style="width: ${stock.total_score}%"></div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge ${getRecommendationBadgeClass(stock.recommendation)}">
+                        ${stock.recommendation}
+                    </span>
+                </td>
+                <td class="text-price">${formatPrice(stock.price)}</td>
+                <td>${formatPERatio(stock.pe_ratio)}</td>
+                <td>${formatRiskReward(stock.risk_reward_ratio)}</td>
+                <td class="small">${stock.commentary}</td>
+            </tr>
+        `).join('');
+        
+        // Show rankings container
+        if (rankingsContainer) rankingsContainer.style.display = 'block';
+    } else if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No stocks to display</td></tr>';
+        if (rankingsContainer) rankingsContainer.style.display = 'block';
+    }
+}
+
+// Helper functions for AI evaluation display
+function getRecommendationRowClass(recommendation) {
+    switch (recommendation) {
+        case 'Strong Buy':
+            return 'table-success';
+        case 'Buy':
+            return 'table-info';
+        case 'Hold':
+            return 'table-warning';
+        case 'Weak Hold':
+            return 'table-secondary';
+        case 'Avoid':
+            return 'table-danger';
+        default:
+            return '';
+    }
+}
+
+function getRecommendationBadgeClass(recommendation) {
+    switch (recommendation) {
+        case 'Strong Buy':
+            return 'bg-success';
+        case 'Buy':
+            return 'bg-primary';
+        case 'Hold':
+            return 'bg-warning text-dark';
+        case 'Weak Hold':
+            return 'bg-secondary';
+        case 'Avoid':
+            return 'bg-danger';
+        default:
+            return 'bg-secondary';
+    }
+}
+
+function getScoreProgressClass(score) {
+    if (score >= 75) return 'bg-success';
+    if (score >= 60) return 'bg-primary';
+    if (score >= 45) return 'bg-warning';
+    if (score >= 30) return 'bg-secondary';
+    return 'bg-danger';
+}
+
+function formatRiskReward(riskReward) {
+    if (riskReward === null || riskReward === undefined || riskReward === 'N/A' || riskReward === '') {
+        return 'N/A';
+    }
+    
+    const numRR = typeof riskReward === 'string' ? parseFloat(riskReward) : riskReward;
+    if (isNaN(numRR)) {
+        return 'N/A';
+    }
+    
+    return numRR.toFixed(2);
+}
