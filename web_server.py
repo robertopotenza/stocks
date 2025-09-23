@@ -12,7 +12,8 @@ import sys
 import threading
 import time
 from datetime import datetime
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
+import pandas as pd
 from stock_prices import main as run_stock_fetcher
 from logging_config import setup_logging, get_web_logs, clear_web_logs, get_logger
 
@@ -20,6 +21,9 @@ from logging_config import setup_logging, get_web_logs, clear_web_logs, get_logg
 logger = setup_logging('stocks_app.web_server', enable_web_capture=True)
 
 app = Flask(__name__)
+
+# Configuration
+TICKERS_FILE = os.getenv("TICKERS_FILE", "tickers.xlsx")
 
 # Global state to track job status
 job_status = {
@@ -62,6 +66,14 @@ def run_stock_fetcher_async():
 def health_check():
     """Health check endpoint for load balancers."""
     logger.debug("Health check endpoint accessed")
+    
+    # Check if request accepts HTML (browser request)
+    if request.headers.get('Accept', '').find('text/html') != -1:
+        # Browser request - redirect to dashboard
+        from flask import redirect, url_for
+        return redirect(url_for('dashboard'))
+    
+    # API request - return JSON
     return jsonify({
         'status': 'healthy',
         'service': 'Stock Data Fetcher',
@@ -122,6 +134,84 @@ def get_logs():
             'message': 'No logs available yet',
             'status': job_status['status']
         })
+
+@app.route('/dashboard')
+def dashboard():
+    """Serve the main dashboard HTML page."""
+    logger.debug("Dashboard page accessed")
+    return render_template('dashboard.html')
+
+@app.route('/data')
+def get_stock_data():
+    """Get current stock data from Excel file."""
+    logger.debug("Stock data endpoint accessed")
+    
+    try:
+        if not os.path.exists(TICKERS_FILE):
+            return jsonify({
+                'error': 'Tickers file not found',
+                'stocks': []
+            })
+        
+        # Read Excel file
+        df = pd.read_excel(TICKERS_FILE)
+        
+        # Convert to list of dictionaries
+        stocks = df.to_dict(orient='records')
+        
+        return jsonify({
+            'stocks': stocks,
+            'count': len(stocks),
+            'file': TICKERS_FILE
+        })
+        
+    except Exception as e:
+        logger.error(f"Error reading stock data: {e}")
+        return jsonify({
+            'error': f'Failed to read stock data: {str(e)}',
+            'stocks': []
+        }), 500
+
+@app.route('/add-ticker', methods=['POST'])
+def add_ticker():
+    """Add a new ticker to the Excel file."""
+    logger.debug("Add ticker endpoint accessed")
+    
+    try:
+        data = request.get_json()
+        if not data or 'ticker' not in data:
+            return jsonify({'error': 'Ticker symbol is required'}), 400
+        
+        ticker = data['ticker'].strip().upper()
+        if not ticker:
+            return jsonify({'error': 'Invalid ticker symbol'}), 400
+        
+        # Read existing Excel file or create new DataFrame
+        if os.path.exists(TICKERS_FILE):
+            df = pd.read_excel(TICKERS_FILE)
+        else:
+            df = pd.DataFrame(columns=['Ticker'])
+        
+        # Check if ticker already exists
+        if 'Ticker' in df.columns and ticker in df['Ticker'].values:
+            return jsonify({'error': f'Ticker {ticker} already exists'}), 400
+        
+        # Add new ticker
+        new_row = pd.DataFrame([{'Ticker': ticker}])
+        df = pd.concat([df, new_row], ignore_index=True)
+        
+        # Save to Excel file
+        df.to_excel(TICKERS_FILE, index=False)
+        
+        logger.info(f"Added ticker {ticker} to {TICKERS_FILE}")
+        return jsonify({
+            'message': f'Ticker {ticker} added successfully',
+            'ticker': ticker
+        })
+        
+    except Exception as e:
+        logger.error(f"Error adding ticker: {e}")
+        return jsonify({'error': f'Failed to add ticker: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # Get port from environment (Railway, Heroku, etc.)
