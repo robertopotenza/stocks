@@ -176,10 +176,71 @@
                                             <th>Price</th>
                                             <th>P/E</th>
                                             <th>Risk/Reward</th>
+                                            <th>Sentiment</th>
                                             <th>AI Commentary</th>
                                         </tr>
                                     </thead>
                                     <tbody id="ai-rankings-tbody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <!-- Sentiment Analysis Section -->
+                        <div id="sentiment-summary-section" style="display: none;">
+                            <hr class="my-4">
+                            <h6><i class="fas fa-comments me-2"></i>Social Media Sentiment Analysis</h6>
+                            
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <div class="card bg-info text-white">
+                                        <div class="card-body text-center">
+                                            <h4 id="total-mentions">0</h4>
+                                            <small>Total Mentions</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-success text-white">
+                                        <div class="card-body text-center">
+                                            <h4 id="most-positive-ticker">-</h4>
+                                            <small>Most Positive</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-danger text-white">
+                                        <div class="card-body text-center">
+                                            <h4 id="most-negative-ticker">-</h4>
+                                            <small>Most Negative</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-secondary text-white">
+                                        <div class="card-body text-center">
+                                            <h4 id="average-sentiment">0.0</h4>
+                                            <small>Avg Sentiment</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Sentiment Rankings Table -->
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover table-sm" id="sentiment-rankings-table">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Ticker</th>
+                                            <th>Mentions</th>
+                                            <th>Positive %</th>
+                                            <th>Neutral %</th>
+                                            <th>Negative %</th>
+                                            <th>Overall Score</th>
+                                            <th>Trend</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sentiment-rankings-tbody">
                                     </tbody>
                                 </table>
                             </div>
@@ -195,6 +256,94 @@
                         <div id="ai-results" class="mt-4" style="display: none;">
                             <h6><i class="fas fa-robot me-2"></i>AI Analysis Results</h6>
                             <div id="ai-results-content"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Social Media Sentiment Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-comments me-2"></i>Social Media Sentiment Analysis
+                        </h5>
+                        <button class="btn btn-sm btn-outline-primary" onclick="runSentimentAnalysis()">
+                            <i class="fas fa-chart-bar"></i> Analyze Sentiment
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="sentiment-analysis-loading" class="text-center py-4" style="display: none;">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div class="mt-2">Analyzing social media sentiment...</div>
+                        </div>
+                        
+                        <!-- Standalone Sentiment Summary -->
+                        <div id="standalone-sentiment-section" style="display: none;">
+                            <div class="row mb-4">
+                                <div class="col-md-3">
+                                    <div class="card bg-info text-white">
+                                        <div class="card-body text-center">
+                                            <h3 id="standalone-total-mentions">0</h3>
+                                            <small>Total Mentions</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-success text-white">
+                                        <div class="card-body text-center">
+                                            <h3 id="standalone-most-positive">-</h3>
+                                            <small>Most Positive</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-danger text-white">
+                                        <div class="card-body text-center">
+                                            <h3 id="standalone-most-negative">-</h3>
+                                            <small>Most Negative</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card bg-secondary text-white">
+                                        <div class="card-body text-center">
+                                            <h3 id="standalone-average-sentiment">0.0</h3>
+                                            <small>Avg Sentiment</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Standalone Sentiment Rankings Table -->
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Rank</th>
+                                            <th>Ticker</th>
+                                            <th>Mentions</th>
+                                            <th>Positive %</th>
+                                            <th>Neutral %</th>
+                                            <th>Negative %</th>
+                                            <th>Overall Score</th>
+                                            <th>Trend</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="standalone-sentiment-tbody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div id="sentiment-analysis-placeholder" class="text-center text-muted py-4">
+                            <i class="fas fa-comments fa-3x mb-3"></i>
+                            <p>Click "Analyze Sentiment" to get social media sentiment analysis for your tickers.</p>
+                            <p class="small">We analyze posts from Reddit and Twitter/X over the last 5 days to gauge market sentiment for each stock.</p>
                         </div>
                     </div>
                 </div>

@@ -578,6 +578,7 @@ function displayAIEvaluation(data) {
                 <td class="text-price">${formatPrice(stock.price)}</td>
                 <td>${formatPERatio(stock.pe_ratio)}</td>
                 <td>${formatRiskReward(stock.risk_reward_ratio)}</td>
+                <td>${formatSentiment(stock.sentiment_data)}</td>
                 <td class="small">${stock.commentary}</td>
             </tr>
         `).join('');
@@ -585,8 +586,13 @@ function displayAIEvaluation(data) {
         // Show rankings container
         if (rankingsContainer) rankingsContainer.style.display = 'block';
     } else if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No stocks to display</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No stocks to display</td></tr>';
         if (rankingsContainer) rankingsContainer.style.display = 'block';
+    }
+    
+    // Display sentiment summary if available
+    if (data.sentiment_summary) {
+        displaySentimentSummary(data.sentiment_summary);
     }
 }
 
@@ -644,4 +650,218 @@ function formatRiskReward(riskReward) {
     }
     
     return numRR.toFixed(2);
+}
+
+// Sentiment Analysis Functions
+
+// Run sentiment analysis for current tickers
+async function runSentimentAnalysis() {
+    const loadingElement = document.getElementById('sentiment-analysis-loading');
+    const placeholderElement = document.getElementById('sentiment-analysis-placeholder');
+    const sentimentSection = document.getElementById('standalone-sentiment-section');
+    
+    try {
+        // Show loading state
+        loadingElement.style.display = 'block';
+        placeholderElement.style.display = 'none';
+        sentimentSection.style.display = 'none';
+        
+        showSuccess('Analyzing social media sentiment...');
+        
+        const response = await fetch('/sentiment-analysis');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Display results
+        displayStandaloneSentiment(data);
+        showSuccess('Sentiment analysis completed successfully!');
+        
+    } catch (error) {
+        console.error('Error running sentiment analysis:', error);
+        showError('Sentiment analysis failed: ' + error.message);
+        
+        // Hide loading and show placeholder
+        loadingElement.style.display = 'none';
+        placeholderElement.style.display = 'block';
+        
+    } finally {
+        loadingElement.style.display = 'none';
+    }
+}
+
+// Display standalone sentiment analysis results
+function displayStandaloneSentiment(data) {
+    const sentimentSection = document.getElementById('standalone-sentiment-section');
+    const placeholderElement = document.getElementById('sentiment-analysis-placeholder');
+    
+    // Hide placeholder
+    if (placeholderElement) {
+        placeholderElement.style.display = 'none';
+    }
+    
+    // Update summary metrics
+    const totalMentions = document.getElementById('standalone-total-mentions');
+    const mostPositive = document.getElementById('standalone-most-positive');
+    const mostNegative = document.getElementById('standalone-most-negative');
+    const avgSentiment = document.getElementById('standalone-average-sentiment');
+    
+    if (data.portfolio_summary) {
+        const summary = data.portfolio_summary;
+        if (totalMentions) totalMentions.textContent = summary.total_mentions_across_all_tickers || 0;
+        if (mostPositive) mostPositive.textContent = summary.most_positive_ticker || '-';
+        if (mostNegative) mostNegative.textContent = summary.most_negative_ticker || '-';
+        if (avgSentiment) avgSentiment.textContent = summary.average_sentiment_score || '0.0';
+    }
+    
+    // Populate sentiment table
+    const tbody = document.getElementById('standalone-sentiment-tbody');
+    if (tbody && data.sentiment_data) {
+        const sentimentArray = Object.entries(data.sentiment_data)
+            .map(([ticker, sentimentData]) => ({ ticker, ...sentimentData }))
+            .sort((a, b) => (b.overall_sentiment_score || 0) - (a.overall_sentiment_score || 0));
+        
+        tbody.innerHTML = sentimentArray.map((item, index) => `
+            <tr class="${getSentimentRowClass(item.overall_sentiment_score)}">
+                <td class="fw-bold">${index + 1}</td>
+                <td class="fw-bold">${item.ticker}</td>
+                <td class="text-center">${item.total_mentions || 0}</td>
+                <td class="text-center">${item.sentiment_percentages?.positive || 0}%</td>
+                <td class="text-center">${item.sentiment_percentages?.neutral || 0}%</td>
+                <td class="text-center">${item.sentiment_percentages?.negative || 0}%</td>
+                <td class="text-center">
+                    <span class="badge ${getSentimentBadgeClass(item.overall_sentiment_score)}">
+                        ${(item.overall_sentiment_score || 0).toFixed(3)}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="badge ${getTrendBadgeClass(item.trend_direction)}">
+                        ${getTrendIcon(item.trend_direction)} ${item.trend_direction || 'stable'}
+                    </span>
+                </td>
+            </tr>
+        `).join('');
+    } else if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No sentiment data available</td></tr>';
+    }
+    
+    // Show sentiment section
+    if (sentimentSection) {
+        sentimentSection.style.display = 'block';
+    }
+}
+
+// Display sentiment summary (when integrated with AI evaluation)
+function displaySentimentSummary(sentimentSummary) {
+    const sentimentSection = document.getElementById('sentiment-summary-section');
+    
+    if (!sentimentSection || !sentimentSummary) return;
+    
+    // Update summary metrics
+    const totalMentions = document.getElementById('total-mentions');
+    const mostPositive = document.getElementById('most-positive-ticker');
+    const mostNegative = document.getElementById('most-negative-ticker');
+    const avgSentiment = document.getElementById('average-sentiment');
+    
+    if (totalMentions) totalMentions.textContent = sentimentSummary.total_mentions_across_portfolio || 0;
+    if (mostPositive) mostPositive.textContent = sentimentSummary.most_positive_ticker || '-';
+    if (mostNegative) mostNegative.textContent = sentimentSummary.most_negative_ticker || '-';
+    if (avgSentiment) avgSentiment.textContent = sentimentSummary.average_sentiment_score || '0.0';
+    
+    // Populate sentiment table
+    const tbody = document.getElementById('sentiment-rankings-tbody');
+    if (tbody && sentimentSummary.sentiment_data) {
+        const sentimentArray = Object.entries(sentimentSummary.sentiment_data)
+            .map(([ticker, sentimentData]) => ({ ticker, ...sentimentData }))
+            .sort((a, b) => (b.overall_sentiment_score || 0) - (a.overall_sentiment_score || 0));
+        
+        tbody.innerHTML = sentimentArray.map(item => `
+            <tr class="${getSentimentRowClass(item.overall_sentiment_score)}">
+                <td class="fw-bold">${item.ticker}</td>
+                <td class="text-center">${item.total_mentions || 0}</td>
+                <td class="text-center">${item.sentiment_percentages?.positive || 0}%</td>
+                <td class="text-center">${item.sentiment_percentages?.neutral || 0}%</td>
+                <td class="text-center">${item.sentiment_percentages?.negative || 0}%</td>
+                <td class="text-center">
+                    <span class="badge ${getSentimentBadgeClass(item.overall_sentiment_score)}">
+                        ${(item.overall_sentiment_score || 0).toFixed(3)}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="badge ${getTrendBadgeClass(item.trend_direction)}">
+                        ${getTrendIcon(item.trend_direction)} ${item.trend_direction || 'stable'}
+                    </span>
+                </td>
+            </tr>
+        `).join('');
+    }
+    
+    // Show sentiment section
+    sentimentSection.style.display = 'block';
+}
+
+// Format sentiment data for AI evaluation table
+function formatSentiment(sentimentData) {
+    if (!sentimentData || sentimentData.total_mentions === 0) {
+        return '<small class="text-muted">No data</small>';
+    }
+    
+    const score = sentimentData.overall_sentiment_score || 0;
+    const mentions = sentimentData.total_mentions || 0;
+    const badgeClass = getSentimentBadgeClass(score);
+    
+    return `
+        <div class="text-center">
+            <span class="badge ${badgeClass} mb-1">${score.toFixed(2)}</span>
+            <br>
+            <small class="text-muted">${mentions} mentions</small>
+        </div>
+    `;
+}
+
+// Helper functions for sentiment display
+function getSentimentRowClass(score) {
+    if (score > 0.2) return 'table-success';
+    if (score > 0.05) return 'table-info';
+    if (score < -0.2) return 'table-danger';
+    if (score < -0.05) return 'table-warning';
+    return '';
+}
+
+function getSentimentBadgeClass(score) {
+    if (score > 0.2) return 'bg-success';
+    if (score > 0.05) return 'bg-primary';
+    if (score < -0.2) return 'bg-danger';
+    if (score < -0.05) return 'bg-warning text-dark';
+    return 'bg-secondary';
+}
+
+function getTrendBadgeClass(trend) {
+    switch (trend) {
+        case 'improving':
+            return 'bg-success';
+        case 'declining':
+            return 'bg-danger';
+        case 'stable':
+        default:
+            return 'bg-secondary';
+    }
+}
+
+function getTrendIcon(trend) {
+    switch (trend) {
+        case 'improving':
+            return '↗';
+        case 'declining':
+            return '↘';
+        case 'stable':
+        default:
+            return '→';
+    }
 }
