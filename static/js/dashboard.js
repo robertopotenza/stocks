@@ -965,6 +965,10 @@ function displayRoutineAnalysis(data) {
             row.innerHTML = `
                 <td>${index + 1}</td>
                 <td><strong>${stock.ticker}</strong></td>
+                <td>${stock.price || 'N/A'}</td>
+                <td class="text-center">${(stock.ai_evaluation?.score || 0).toFixed(1)}</td>
+                <td class="text-center">${(stock.sentiment_analysis?.score || 0).toFixed(1)}</td>
+                <td class="text-center">${(stock.risk_reward?.score || 0).toFixed(1)}</td>
                 <td>
                     <div class="progress" style="height: 20px;">
                         <div class="progress-bar ${getRoutineScoreProgressClass(stock.combined_score)}" 
@@ -982,8 +986,6 @@ function displayRoutineAnalysis(data) {
                         ${stock.combined_recommendation}
                     </span>
                 </td>
-                <td class="text-center">${(stock.ai_evaluation?.score || 0).toFixed(1)}</td>
-                <td class="text-center">${(stock.sentiment_analysis?.score || 0).toFixed(1)}</td>
                 <td class="small">${stock.ai_evaluation?.reasoning || stock.sentiment_analysis?.summary || 'No analysis available'}</td>
             `;
             

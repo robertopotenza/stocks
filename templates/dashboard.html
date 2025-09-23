@@ -416,7 +416,7 @@
                             <!-- Methodology Info -->
                             <div class="alert alert-secondary mb-4">
                                 <h6 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Analysis Methodology</h6>
-                                <p class="mb-0">Combined score = (Technical Analysis × 60%) + (Social Media Sentiment × 40%)</p>
+                                <p class="mb-0">Combined score = (AI Score × 50%) + (Sentiment Score × 30%) + (Risk/Reward × 20%)</p>
                             </div>
                         </div>
                         
@@ -429,11 +429,13 @@
                                         <tr>
                                             <th>Rank</th>
                                             <th>Ticker</th>
-                                            <th>Combined Score</th>
-                                            <th>Recommendation</th>
+                                            <th>Price</th>
                                             <th>AI Score</th>
                                             <th>Sentiment Score</th>
-                                            <th>Analysis Summary</th>
+                                            <th>Risk/Reward Score</th>
+                                            <th>Combined Score</th>
+                                            <th>Recommendation</th>
+                                            <th>Commentary</th>
                                         </tr>
                                     </thead>
                                     <tbody id="routine-rankings-tbody">
@@ -445,7 +447,7 @@
                         <div id="routine-analysis-placeholder" class="text-center text-muted py-4">
                             <i class="fas fa-rocket fa-3x mb-3"></i>
                             <p>Click "Routine Run" to execute comprehensive analysis combining AI evaluation and social media sentiment.</p>
-                            <p class="small">This analysis applies 60% weight to technical analysis and 40% weight to social sentiment for optimal stock rankings.</p>
+                            <p class="small">This analysis applies 50% weight to AI evaluation, 30% weight to social sentiment, and 20% weight to risk/reward for optimal stock rankings.</p>
                         </div>
                     </div>
                 </div>
