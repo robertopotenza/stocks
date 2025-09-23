@@ -54,7 +54,7 @@ export ROBINHOOD_USERNAME=your_email@example.com
 export ROBINHOOD_PASSWORD=your_password
 export ROBINHOOD_MFA=123456  # Optional: For non-interactive MFA (useful for deployment)
 
-# Social Media Sentiment Analysis (Optional - will use demo data if not provided)
+# Social Media Sentiment Analysis (Optional - will use fallback if not provided)
 export REDDIT_CLIENT_ID=your_reddit_client_id
 export REDDIT_CLIENT_SECRET=your_reddit_client_secret
 export REDDIT_USER_AGENT=YourApp/1.0
@@ -343,7 +343,6 @@ When running in web mode (`WEB_MODE=true`, which is the default), the applicatio
 - **Smart Rankings**: Automatically ranks stocks from most to least attractive with confidence scores
 - **Plain English Explanations**: AI-generated commentary for each stock evaluation
 - **Visual Indicators**: Color-coded recommendations (Strong Buy, Buy, Hold, Weak Hold, Avoid)
-- **Demo Mode**: Test the system with sample data
 
 **📱 Social Media Sentiment Analysis**
 - **Portfolio Sentiment**: Analyze sentiment for all your tickers at once
@@ -365,16 +364,9 @@ When running in web mode (`WEB_MODE=true`, which is the default), the applicatio
 - **`GET /logs`** - View captured application logs
 - **`GET /ai-evaluation`** - Run AI evaluation with sentiment integration
 - **`GET /quick-evaluation`** - Quick AI evaluation with fresh data
-- **`GET /demo-evaluation`** - Demo AI evaluation with sample data
 - **`GET /sentiment-analysis`** - Analyze sentiment for current tickers
 - **`GET /ticker-sentiment/<ticker>`** - Get sentiment for specific ticker
 
-### Demo Mode
-
-If you don't have Reddit/Twitter API credentials or Robinhood credentials, the system automatically falls back to realistic demo data:
-- **Sentiment Analysis**: Uses simulated social media data with realistic mention counts and sentiment scores
-- **AI Evaluation**: Provides sample stock evaluations with demo data
-- **Full Functionality**: All dashboard features work without requiring API credentials
 
 ## Security Notes
 
