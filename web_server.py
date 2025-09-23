@@ -14,7 +14,8 @@ import time
 from datetime import datetime
 from flask import Flask, jsonify, request, render_template, send_file
 import pandas as pd
-from stock_prices import main as run_stock_fetcher
+from stock_prices import main as run_stock_fetcher, fetch_stock_data, load_tickers_from_excel
+from ai_evaluation import evaluate_stock_portfolio
 from logging_config import setup_logging, get_web_logs, clear_web_logs, get_logger
 
 # Setup logging with web capture enabled
@@ -241,6 +242,105 @@ def download_excel():
     except Exception as e:
         logger.error(f"Error downloading Excel file: {e}")
         return jsonify({'error': f'Failed to download Excel file: {str(e)}'}), 500
+
+@app.route('/ai-evaluation')
+def get_ai_evaluation():
+    """Get AI-powered stock evaluation and rankings."""
+    logger.debug("AI evaluation endpoint accessed")
+    
+    try:
+        # Load current stock data from Excel file
+        if not os.path.exists(TICKERS_FILE):
+            return jsonify({
+                'error': 'No stock data available for evaluation. Run stock fetch job first.'
+            }), 404
+        
+        # Read the Excel file to get stock data
+        df = pd.read_excel(TICKERS_FILE)
+        
+        # Check if we have the required columns for evaluation
+        required_columns = ['Ticker', 'Price', 'PE_Ratio']
+        if not all(col in df.columns for col in required_columns):
+            return jsonify({
+                'error': 'Stock data is incomplete. Run stock fetch job to get latest data.'
+            }), 400
+        
+        # Convert DataFrame to the format expected by AI evaluation
+        stock_data = {}
+        for _, row in df.iterrows():
+            ticker = row['Ticker']
+            # Convert row to dictionary, handling NaN values
+            data = {}
+            for col in df.columns:
+                value = row[col]
+                if pd.isna(value):
+                    data[col] = 'N/A'
+                else:
+                    data[col] = value
+            stock_data[ticker] = data
+        
+        # Run AI evaluation
+        logger.info(f"Running AI evaluation on {len(stock_data)} stocks")
+        evaluation_result = evaluate_stock_portfolio(stock_data)
+        
+        logger.info(f"AI evaluation completed. Top pick: {evaluation_result['summary'].get('top_pick', 'None')}")
+        
+        return jsonify(evaluation_result)
+        
+    except Exception as e:
+        logger.error(f"Error in AI evaluation: {e}")
+        return jsonify({'error': f'Failed to perform AI evaluation: {str(e)}'}), 500
+
+@app.route('/quick-evaluation')
+def get_quick_evaluation():
+    """Get a quick AI evaluation using live data (without full stock fetch)."""
+    logger.debug("Quick evaluation endpoint accessed")
+    
+    try:
+        # Load tickers from Excel file
+        if not os.path.exists(TICKERS_FILE):
+            return jsonify({
+                'error': 'No tickers file found. Please add some tickers first.'
+            }), 404
+        
+        # Check if credentials are available for quick fetch
+        username = os.getenv("ROBINHOOD_USERNAME", "your_email")
+        password = os.getenv("ROBINHOOD_PASSWORD", "your_password") 
+        
+        if username == "your_email" or password == "your_password":
+            return jsonify({
+                'error': 'Robinhood credentials not configured for quick evaluation.'
+            }), 400
+        
+        # Load tickers
+        tickers = load_tickers_from_excel(TICKERS_FILE)
+        if not tickers:
+            return jsonify({
+                'error': 'No valid tickers found in file.'
+            }), 400
+        
+        # Limit to first 10 tickers for quick evaluation
+        limited_tickers = tickers[:10]
+        logger.info(f"Running quick evaluation on {len(limited_tickers)} tickers")
+        
+        # Fetch fresh stock data
+        stock_data = fetch_stock_data(limited_tickers)
+        
+        if not stock_data:
+            return jsonify({
+                'error': 'Failed to fetch stock data for evaluation.'
+            }), 500
+        
+        # Run AI evaluation
+        evaluation_result = evaluate_stock_portfolio(stock_data)
+        
+        logger.info(f"Quick AI evaluation completed. Top pick: {evaluation_result['summary'].get('top_pick', 'None')}")
+        
+        return jsonify(evaluation_result)
+        
+    except Exception as e:
+        logger.error(f"Error in quick evaluation: {e}")
+        return jsonify({'error': f'Failed to perform quick evaluation: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # Get port from environment (Railway, Heroku, etc.)
