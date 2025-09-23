@@ -720,6 +720,19 @@ function displayStandaloneSentiment(data) {
         if (avgSentiment) avgSentiment.textContent = summary.average_standardized_sentiment_score || summary.average_sentiment_score || '50.0';
     }
     
+    // Handle data quality warning
+    const warningElement = document.getElementById('sentiment-data-warning');
+    const warningMessageElement = document.getElementById('sentiment-warning-message');
+    
+    if (data.portfolio_summary && data.portfolio_summary.has_fallback_data) {
+        if (warningElement) warningElement.style.display = 'block';
+        if (warningMessageElement) {
+            warningMessageElement.textContent = data.portfolio_summary.data_quality_warning || 'Some sentiment data may be simulated.';
+        }
+    } else {
+        if (warningElement) warningElement.style.display = 'none';
+    }
+    
     // Populate sentiment table
     const tbody = document.getElementById('standalone-sentiment-tbody');
     if (tbody && data.sentiment_data) {
@@ -730,18 +743,32 @@ function displayStandaloneSentiment(data) {
         tbody.innerHTML = sentimentArray.map((item, index) => {
             const standardizedScore = item.standardized_sentiment_score || ((item.overall_sentiment_score + 1) * 50);
             const hasData = item.total_mentions > 0;
+            const isFallback = item.is_fallback_data || false;
+            const hasPartialFallback = item.has_partial_fallback_data || false;
+            
+            // Add indicators for fallback data
+            let tickerDisplay = item.ticker;
+            let rowClass = getSentimentRowClass(standardizedScore);
+            
+            if (isFallback) {
+                tickerDisplay += ' <span class="badge bg-warning text-dark ms-1" title="Simulated data - APIs unavailable">SIM</span>';
+                rowClass += ' table-warning-subtle';
+            } else if (hasPartialFallback) {
+                tickerDisplay += ' <span class="badge bg-info text-dark ms-1" title="Partial data - some APIs unavailable">PARTIAL</span>';
+                rowClass += ' table-info-subtle';
+            }
             
             return `
-            <tr class="${getSentimentRowClass(standardizedScore)}">
+            <tr class="${rowClass}">
                 <td class="fw-bold">${index + 1}</td>
-                <td class="fw-bold">${item.ticker}</td>
+                <td class="fw-bold">${tickerDisplay}</td>
                 <td class="text-center">${item.total_mentions || 0}</td>
                 <td class="text-center">${hasData ? (item.sentiment_percentages?.positive || 0) + '%' : '<span class="text-muted">-</span>'}</td>
                 <td class="text-center">${hasData ? (item.sentiment_percentages?.neutral || 0) + '%' : '<span class="text-muted">-</span>'}</td>
                 <td class="text-center">${hasData ? (item.sentiment_percentages?.negative || 0) + '%' : '<span class="text-muted">-</span>'}</td>
                 <td class="text-center">
                     <span class="badge ${getSentimentBadgeClass(standardizedScore)}">
-                        ${standardizedScore.toFixed(1)}
+                        ${standardizedScore.toFixed(1)}${isFallback ? '*' : ''}
                     </span>
                 </td>
                 <td class="text-center">
