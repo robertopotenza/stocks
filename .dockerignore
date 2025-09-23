@@ -1,0 +1,35 @@
+# Git files
+.git
+.gitignore
+
+# Documentation
+README.md
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+.env
+venv
+.venv
+
+# IDE files
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Configuration files with credentials
+config.py
+
+# Build artifacts
+build
+dist
+*.egg-info
