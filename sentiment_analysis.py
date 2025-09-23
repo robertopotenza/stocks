@@ -242,7 +242,9 @@ class RedditSentimentFetcher:
             'overall_score': 0.0,
             'standardized_sentiment_score': 50.0,  # Neutral on 0-100 scale
             'trend_direction': 'stable',
-            'posts_analyzed': []
+            'posts_analyzed': [],
+            'is_fallback_data': True,  # Clear indicator this is fallback data
+            'fallback_reason': 'Reddit API unavailable'
         }
     
     def _calculate_overall_sentiment(self, ticker: str, source: str, sentiments: List[Dict], posts: List[Dict]) -> Dict[str, Any]:
@@ -453,7 +455,9 @@ class TwitterSentimentFetcher:
             'overall_score': 0.0,
             'standardized_sentiment_score': 50.0,  # Neutral on 0-100 scale
             'trend_direction': 'stable',
-            'posts_analyzed': []
+            'posts_analyzed': [],
+            'is_fallback_data': True,  # Clear indicator this is fallback data
+            'fallback_reason': 'Twitter API unavailable'
         }
     
     def _calculate_overall_sentiment(self, ticker: str, source: str, sentiments: List[Dict], posts: List[Dict]) -> Dict[str, Any]:
@@ -569,8 +573,18 @@ class SocialMediaSentimentAnalyzer:
         # Calculate total mentions
         total_mentions = reddit_data['total_mentions'] + twitter_data['total_mentions']
         
+        # Check if both platforms returned fallback data
+        reddit_is_fallback = reddit_data.get('is_fallback_data', False)
+        twitter_is_fallback = twitter_data.get('is_fallback_data', False)
+        both_fallback = reddit_is_fallback and twitter_is_fallback
+        
         if total_mentions == 0:
-            return self._get_fallback_sentiment(ticker)
+            fallback_data = self._get_fallback_sentiment(ticker)
+            # If both platforms are fallback, add specific reason
+            if both_fallback:
+                fallback_data['fallback_reason'] = 'Both Reddit and Twitter APIs unavailable'
+                fallback_data['is_fallback_data'] = True
+            return fallback_data
         
         # Combine sentiment breakdowns
         combined_breakdown = {
@@ -605,7 +619,7 @@ class SocialMediaSentimentAnalyzer:
         # Sentiment Score = ((% Positive - % Negative) + 100) / 2
         standardized_sentiment_score = ((combined_percentages['positive'] - combined_percentages['negative']) + 100) / 2
 
-        return {
+        result = {
             'ticker': ticker,
             'total_mentions': total_mentions,
             'sentiment_breakdown': combined_breakdown,
@@ -619,6 +633,17 @@ class SocialMediaSentimentAnalyzer:
             },
             'last_updated': datetime.now().isoformat()
         }
+        
+        # Add fallback indicators if any platform used fallback data
+        if reddit_is_fallback or twitter_is_fallback:
+            result['has_partial_fallback_data'] = True
+            result['fallback_platforms'] = []
+            if reddit_is_fallback:
+                result['fallback_platforms'].append('reddit')
+            if twitter_is_fallback:
+                result['fallback_platforms'].append('twitter')
+        
+        return result
     
     def _get_fallback_sentiment(self, ticker: str) -> Dict[str, Any]:
         """Generate fallback sentiment data when analysis fails."""
@@ -635,7 +660,9 @@ class SocialMediaSentimentAnalyzer:
                 'twitter': {'total_mentions': 0, 'overall_score': 0.0}
             },
             'last_updated': datetime.now().isoformat(),
-            'error': 'Unable to fetch sentiment data'
+            'error': 'Unable to fetch sentiment data',
+            'is_fallback_data': True,  # Clear indicator this is fallback data
+            'fallback_reason': 'Social media APIs unavailable'
         }
 
 def get_cached_portfolio_sentiment(tickers: List[str], days: int = 5, ttl_seconds: int = 300) -> Dict[str, Any]:
@@ -698,6 +725,18 @@ def _analyze_portfolio_sentiment_original(tickers: List[str], days: int = 5) -> 
     # Calculate portfolio-level statistics
     total_mentions = sum(data['total_mentions'] for data in sentiment_results.values())
     
+    # Check for fallback data usage
+    fallback_tickers = []
+    partially_fallback_tickers = []
+    for ticker, data in sentiment_results.items():
+        if data.get('is_fallback_data', False):
+            fallback_tickers.append(ticker)
+        elif data.get('has_partial_fallback_data', False):
+            partially_fallback_tickers.append(ticker)
+    
+    is_all_fallback = len(fallback_tickers) == len(sentiment_results)
+    has_any_fallback = len(fallback_tickers) > 0 or len(partially_fallback_tickers) > 0
+    
     if total_mentions > 0:
         # Calculate weighted average sentiment score (raw -1 to 1 scale)
         weighted_score = sum(
@@ -726,18 +765,32 @@ def _analyze_portfolio_sentiment_original(tickers: List[str], days: int = 5) -> 
         most_positive = None
         most_negative = None
     
+    portfolio_summary = {
+        'total_mentions_across_all_tickers': total_mentions,
+        'average_sentiment_score': round(weighted_score, 3),  # Legacy raw score
+        'average_standardized_sentiment_score': round(weighted_standardized_score, 1),  # Standardized 0-100 score
+        'most_positive_ticker': most_positive[0] if most_positive else None,
+        'most_negative_ticker': most_negative[0] if most_negative else None,
+        'analysis_period_days': days,
+        'last_updated': datetime.now().isoformat()
+    }
+    
+    # Add fallback data indicators
+    if has_any_fallback:
+        portfolio_summary['has_fallback_data'] = True
+        portfolio_summary['is_all_fallback'] = is_all_fallback
+        portfolio_summary['fallback_tickers'] = fallback_tickers
+        portfolio_summary['partially_fallback_tickers'] = partially_fallback_tickers
+        
+        if is_all_fallback:
+            portfolio_summary['data_quality_warning'] = 'All sentiment data is simulated due to unavailable social media APIs'
+        else:
+            portfolio_summary['data_quality_warning'] = f'Some sentiment data is simulated ({len(fallback_tickers + partially_fallback_tickers)} of {len(sentiment_results)} tickers affected)'
+    
     return {
         'tickers_analyzed': list(sentiment_results.keys()),
         'sentiment_data': sentiment_results,
-        'portfolio_summary': {
-            'total_mentions_across_all_tickers': total_mentions,
-            'average_sentiment_score': round(weighted_score, 3),  # Legacy raw score
-            'average_standardized_sentiment_score': round(weighted_standardized_score, 1),  # Standardized 0-100 score
-            'most_positive_ticker': most_positive[0] if most_positive else None,
-            'most_negative_ticker': most_negative[0] if most_negative else None,
-            'analysis_period_days': days,
-            'last_updated': datetime.now().isoformat()
-        }
+        'portfolio_summary': portfolio_summary
     }
 
 def analyze_portfolio_sentiment(tickers: List[str], days: int = 5) -> Dict[str, Any]:
