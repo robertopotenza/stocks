@@ -22,23 +22,28 @@ TICKERS_FILE = os.getenv("TICKERS_FILE", "tickers.xlsx")
 
 def login_to_robinhood(username: str, password: str) -> bool:
     """
-    Login to Robinhood with MFA support
-    
-    Args:
-        username: Robinhood username/email
-        password: Robinhood password
-        
-    Returns:
-        bool: True if login successful, False otherwise
+    Login to Robinhood with optional non-interactive MFA support.
+
+    If ROBINHOOD_MFA environment variable is set, it will be used.
+    Otherwise the function will prompt for MFA (interactive).
     """
     try:
-        # MFA code if enabled (Robinhood may text/email you)
-        mfa_code = input("MFA Code (press Enter if no MFA): ").strip()
-        if not mfa_code:
-            mfa_code = None
-            
+        # Try to get MFA code from environment first (non-interactive)
+        mfa_code = os.getenv("ROBINHOOD_MFA")
+        if mfa_code:
+            mfa_code = mfa_code.strip() or None
+        else:
+            # interactive fallback (not available on headless platforms)
+            try:
+                mfa_code = input("MFA Code (press Enter if no MFA): ").strip()
+                if not mfa_code:
+                    mfa_code = None
+            except Exception:
+                # If input() isn't available, proceed without MFA (may fail)
+                mfa_code = None
+
         login = r.login(username, password, mfa_code=mfa_code)
-        
+
         if login:
             print("✓ Successfully logged into Robinhood")
             return True
