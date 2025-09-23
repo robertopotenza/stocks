@@ -40,7 +40,12 @@ A Python script that fetches comprehensive stock data from Robinhood for a list 
 ```bash
 export ROBINHOOD_USERNAME=your_email@example.com
 export ROBINHOOD_PASSWORD=your_password
+export ROBINHOOD_MFA=123456  # Optional: For non-interactive MFA (useful for deployment)
 ```
+
+**Note**: For Multi-Factor Authentication (MFA), you can either:
+- Set `ROBINHOOD_MFA` environment variable for non-interactive mode (useful for headless deployments)
+- Leave it unset to be prompted interactively for the MFA code
 
 ### Method 2: Configuration File
 1. Copy the example configuration:
@@ -191,6 +196,7 @@ Set these environment variables in your Railway project:
 
 - `ROBINHOOD_USERNAME`: Your Robinhood email/username
 - `ROBINHOOD_PASSWORD`: Your Robinhood password  
+- `ROBINHOOD_MFA`: (Optional) Your MFA code for non-interactive login
 - `TICKERS_FILE`: Set to `tickers.xlsx` if keeping the Excel file in the repository
 
 ### Database Storage (Optional)
@@ -204,7 +210,7 @@ If you need persistent storage for the `tickers.xlsx` file:
 ### Railway Configuration Files
 
 - `Dockerfile`: Containerizes the application for Railway
-- `Procfile`: Specifies this as a Worker service (`worker: python main.py`)
+- `Procfile`: Specifies this as a Worker service (`worker: python stock_prices.py`)
 
 ## Security Notes
 
