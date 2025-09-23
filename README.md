@@ -62,12 +62,14 @@ Edit the `USERNAME` and `PASSWORD` variables at the top of `stock_prices.py`
 
 The script reads ticker symbols from an Excel file named `tickers.xlsx` (configurable). The file must have a column named 'Ticker'.
 
-A sample file is included with popular stocks: AAPL, GOOGL, MSFT, TSLA, AMZN, META, NVDA, NFLX
+A sample file (`sample_tickers.xlsx`) is included with popular stocks: AAPL, GOOGL, MSFT, TSLA, AMZN, META, NVDA, NFLX
 
 To create your own:
-1. Create an Excel file with a 'Ticker' column
+1. Create an Excel file with a 'Ticker' column  
 2. List your desired stock symbols (e.g., AAPL, MSFT, GOOGL)
 3. Save as `tickers.xlsx` or update the `TICKERS_FILE` variable
+
+You can also start by copying `sample_tickers.xlsx` to `tickers.xlsx` and modify it as needed.
 
 After running the script, the Excel file will be updated with additional columns:
 - **Price**: Current stock price
