@@ -729,14 +729,16 @@ function displayStandaloneSentiment(data) {
         
         tbody.innerHTML = sentimentArray.map((item, index) => {
             const standardizedScore = item.standardized_sentiment_score || ((item.overall_sentiment_score + 1) * 50);
+            const hasData = item.total_mentions > 0;
+            
             return `
             <tr class="${getSentimentRowClass(standardizedScore)}">
                 <td class="fw-bold">${index + 1}</td>
                 <td class="fw-bold">${item.ticker}</td>
                 <td class="text-center">${item.total_mentions || 0}</td>
-                <td class="text-center">${item.sentiment_percentages?.positive || 0}%</td>
-                <td class="text-center">${item.sentiment_percentages?.neutral || 0}%</td>
-                <td class="text-center">${item.sentiment_percentages?.negative || 0}%</td>
+                <td class="text-center">${hasData ? (item.sentiment_percentages?.positive || 0) + '%' : '<span class="text-muted">-</span>'}</td>
+                <td class="text-center">${hasData ? (item.sentiment_percentages?.neutral || 0) + '%' : '<span class="text-muted">-</span>'}</td>
+                <td class="text-center">${hasData ? (item.sentiment_percentages?.negative || 0) + '%' : '<span class="text-muted">-</span>'}</td>
                 <td class="text-center">
                     <span class="badge ${getSentimentBadgeClass(standardizedScore)}">
                         ${standardizedScore.toFixed(1)}
@@ -785,13 +787,15 @@ function displaySentimentSummary(sentimentSummary) {
         
         tbody.innerHTML = sentimentArray.map(item => {
             const standardizedScore = item.standardized_sentiment_score || ((item.overall_sentiment_score + 1) * 50);
+            const hasData = item.total_mentions > 0;
+            
             return `
             <tr class="${getSentimentRowClass(standardizedScore)}">
                 <td class="fw-bold">${item.ticker}</td>
                 <td class="text-center">${item.total_mentions || 0}</td>
-                <td class="text-center">${item.sentiment_percentages?.positive || 0}%</td>
-                <td class="text-center">${item.sentiment_percentages?.neutral || 0}%</td>
-                <td class="text-center">${item.sentiment_percentages?.negative || 0}%</td>
+                <td class="text-center">${hasData ? (item.sentiment_percentages?.positive || 0) + '%' : '<span class="text-muted">-</span>'}</td>
+                <td class="text-center">${hasData ? (item.sentiment_percentages?.neutral || 0) + '%' : '<span class="text-muted">-</span>'}</td>
+                <td class="text-center">${hasData ? (item.sentiment_percentages?.negative || 0) + '%' : '<span class="text-muted">-</span>'}</td>
                 <td class="text-center">
                     <span class="badge ${getSentimentBadgeClass(standardizedScore)}">
                         ${standardizedScore.toFixed(1)}
