@@ -53,6 +53,9 @@ def get_historical_data(ticker: str, interval: str = 'day', span: str = '3month'
                 except (ValueError, TypeError):
                     continue
                     
+        # Sort the clean data by date to ensure consistent ordering (most recent last)
+        clean_data.sort(key=lambda x: x['date'])
+        
         return clean_data
         
     except Exception as e:

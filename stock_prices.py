@@ -191,6 +191,24 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
         results: Dictionary of ticker to stock data mappings
         file_path: Path to Excel file to write results to
     """
+    def safe_format_float(value, format_spec: str) -> str:
+        """Safely format a value as float, returning 'N/A' for non-numeric values"""
+        if isinstance(value, (int, float)) and value != 'N/A':
+            try:
+                return f"{value:{format_spec}}"
+            except (ValueError, TypeError):
+                return 'N/A'
+        else:
+            return 'N/A'
+    
+    def safe_format_price(value) -> str:
+        """Safely format a price value"""
+        return safe_format_float(value, '>10.2f')
+    
+    def safe_format_number(value, format_spec: str) -> str:
+        """Safely format a number value"""
+        return safe_format_float(value, format_spec)
+    
     try:
         # Create DataFrame with all data
         data_rows = []
@@ -237,10 +255,12 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
             recent_res = row['Recent_Resistance']
             
             if isinstance(price, (int, float)):
-                print(f"{ticker:>8}: ${price:>10.2f} | 52w: ${high_52w:>8.2f}-${low_52w:>8.2f} | "
-                      f"Cap: {market_cap:>12.0f} | P/E: {pe_ratio:>6.2f}")
-                print(f"{'':>8}  Pivot S/R: ${pivot_sup1}-${pivot_res1} | "
-                      f"Recent S/R: ${recent_sup}-${recent_res}")
+                print(f"{ticker:>8}: ${safe_format_price(price)} | "
+                      f"52w: ${safe_format_number(high_52w, '>8.2f')}-${safe_format_number(low_52w, '>8.2f')} | "
+                      f"Cap: {safe_format_number(market_cap, '>12.0f')} | "
+                      f"P/E: {safe_format_number(pe_ratio, '>6.2f')}")
+                print(f"{'':>8}  Pivot S/R: {safe_format_number(pivot_sup1, '.2f')}-{safe_format_number(pivot_res1, '.2f')} | "
+                      f"Recent S/R: {safe_format_number(recent_sup, '.2f')}-{safe_format_number(recent_res, '.2f')}")
             else:
                 print(f"{ticker:>8}: {str(price):>12} | Data: N/A")
         
