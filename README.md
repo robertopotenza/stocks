@@ -225,6 +225,7 @@ If you need persistent storage for the `tickers.xlsx` file:
 ### Railway Configuration Files
 
 - `Dockerfile`: Containerizes the application for Railway
+- `railway.toml`: Railway configuration to ensure correct Python/Docker deployment
 - `Procfile`: Legacy worker configuration (`worker: python stock_prices.py`) 
 - `main.py`: Auto-detects deployment mode (web service vs worker)
 - `web_server.py`: Flask web server for HTTP endpoints
