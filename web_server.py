@@ -27,8 +27,6 @@ job_status = {
 
 def run_stock_fetcher_async():
     """Run the stock fetcher in a background thread."""
-    global job_status
-    
     try:
         job_status['status'] = 'running'
         job_status['last_error'] = None
