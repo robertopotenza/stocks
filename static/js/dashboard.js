@@ -469,49 +469,7 @@ async function runQuickEvaluation() {
     }
 }
 
-// Run demo AI evaluation with sample data
-async function runDemoEvaluation() {
-    const loadingElement = document.getElementById('ai-evaluation-loading');
-    const placeholderElement = document.getElementById('ai-evaluation-placeholder');
-    const summarySection = document.getElementById('ai-summary-section');
-    const rankingsContainer = document.getElementById('ai-rankings-container');
-    
-    try {
-        // Show loading state
-        if (loadingElement) loadingElement.style.display = 'block';
-        if (placeholderElement) placeholderElement.style.display = 'none';
-        if (summarySection) summarySection.style.display = 'none';
-        if (rankingsContainer) rankingsContainer.style.display = 'none';
-        
-        showSuccess('Running demo AI evaluation with sample data...');
-        
-        const response = await fetch('/demo-evaluation');
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.error) {
-            throw new Error(data.error);
-        }
-        
-        // Display results
-        displayAIEvaluation(data);
-        showSuccess('Demo AI evaluation completed! This shows how the AI analyzes real stock data.');
-        
-    } catch (error) {
-        console.error('Error running demo evaluation:', error);
-        showError('Demo evaluation failed: ' + error.message);
-        
-        // Hide loading and show placeholder
-        if (loadingElement) loadingElement.style.display = 'none';
-        if (placeholderElement) placeholderElement.style.display = 'block';
-        
-    } finally {
-        if (loadingElement) loadingElement.style.display = 'none';
-    }
-}
+
 
 // Display AI evaluation results
 function displayAIEvaluation(data) {
