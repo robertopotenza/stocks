@@ -2,6 +2,27 @@
 
 A Python script that fetches comprehensive stock data from Robinhood for a list of tickers stored in an Excel file, then writes the results back to the Excel file with additional stock information.
 
+## 🚀 Quick Start
+
+**New to this application?** See **[GETTING_STARTED.md](GETTING_STARTED.md)** for a complete step-by-step setup guide!
+
+**Quick Reference:**
+- 📚 [Complete Setup Guide](GETTING_STARTED.md) - **Start here for first-time setup**
+- 📁 [File Structure Guide](FILE_STRUCTURE.md) - Understand the project layout
+- ⚡ Easy start: Run `./start.sh` (Linux/Mac) or `start.bat` (Windows)
+
+**Quick Setup:**
+```bash
+# Easy setup script (Linux/Mac)
+./start.sh
+
+# Or manually:
+pip install -r requirements.txt
+export ROBINHOOD_USERNAME=your_email@example.com
+export ROBINHOOD_PASSWORD=your_password
+python3 main.py
+```
+
 ## Features
 
 - Fetches comprehensive stock data using the Robinhood API including:
@@ -78,9 +99,24 @@ After running the script, the Excel file will be updated with additional columns
 
 ## Usage
 
-Run the script:
+### Easy Start (Recommended)
+
+**Linux/Mac:**
+```bash
+./start.sh
+```
+
+**Windows:**
+```cmd
+start.bat
+```
+
+### Manual Start
+
 ```bash
 python stock_prices.py
+# or
+python main.py
 ```
 
 The script will:
