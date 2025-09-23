@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """
-Stock Price Fetcher using Robinhood API
+Stock Data Fetcher using Robinhood API
 
-This script fetches the latest stock prices for tickers listed in an Excel file
-using the robin_stocks library to connect to Robinhood.
+This script fetches comprehensive stock data for tickers listed in an Excel file
+using the robin_stocks library to connect to Robinhood. It retrieves current price,
+52-week high/low, market capitalization, and P/E ratio, then writes the results
+back to the Excel file.
 """
 
 import robin_stocks.robinhood as r
@@ -72,57 +74,147 @@ def load_tickers_from_excel(file_path: str) -> List[str]:
         return []
 
 
-def fetch_stock_prices(tickers: List[str]) -> Dict[str, Any]:
+def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
     """
-    Fetch latest prices for given tickers
+    Fetch comprehensive stock data for given tickers
     
     Args:
         tickers: List of ticker symbols
         
     Returns:
-        Dictionary mapping ticker to price or error message
+        Dictionary mapping ticker to stock data dictionary containing:
+        Price, 52w_High, 52w_Low, MarketCap, PE_Ratio
     """
     results = {}
     total_tickers = len(tickers)
     
-    print(f"\n📈 Fetching prices for {total_tickers} tickers...")
+    print(f"\n📈 Fetching stock data for {total_tickers} tickers...")
     
     for i, ticker in enumerate(tickers, 1):
+        stock_data = {
+            'Price': 'N/A',
+            '52w_High': 'N/A', 
+            '52w_Low': 'N/A',
+            'MarketCap': 'N/A',
+            'PE_Ratio': 'N/A'
+        }
+        
         try:
-            price = r.stocks.get_latest_price(ticker)[0]
-            results[ticker] = float(price) if price else "No price available"
-            print(f"  {i}/{total_tickers} {ticker}: ${price}")
+            # Get current price from quotes
+            quote_data = r.stocks.get_quotes(ticker)
+            if quote_data and len(quote_data) > 0:
+                price = quote_data[0].get('last_trade_price')
+                if price:
+                    stock_data['Price'] = float(price)
+            
+            # Get fundamentals data
+            fundamental_data = r.stocks.get_fundamentals(ticker)
+            if fundamental_data and len(fundamental_data) > 0:
+                fund = fundamental_data[0]
+                
+                # 52-week high
+                high_52w = fund.get('high_52_weeks')
+                if high_52w:
+                    stock_data['52w_High'] = float(high_52w)
+                
+                # 52-week low
+                low_52w = fund.get('low_52_weeks')
+                if low_52w:
+                    stock_data['52w_Low'] = float(low_52w)
+                
+                # Market cap
+                market_cap = fund.get('market_cap')
+                if market_cap:
+                    stock_data['MarketCap'] = float(market_cap)
+                
+                # P/E ratio
+                pe_ratio = fund.get('pe_ratio')
+                if pe_ratio:
+                    stock_data['PE_Ratio'] = float(pe_ratio)
+            
+            results[ticker] = stock_data
+            print(f"  {i}/{total_tickers} {ticker}: ${stock_data['Price']}")
+            
         except Exception as e:
             error_msg = f"Error: {e}"
-            results[ticker] = error_msg
+            results[ticker] = {
+                'Price': error_msg,
+                '52w_High': 'N/A',
+                '52w_Low': 'N/A', 
+                'MarketCap': 'N/A',
+                'PE_Ratio': 'N/A'
+            }
             print(f"  {i}/{total_tickers} {ticker}: {error_msg}")
     
     return results
 
 
-def print_results(results: Dict[str, Any]) -> None:
+def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]], file_path: str) -> None:
     """
-    Print formatted results
+    Write stock data results back to Excel file
     
     Args:
-        results: Dictionary of ticker to price/error mappings
+        tickers: List of original ticker symbols
+        results: Dictionary of ticker to stock data mappings
+        file_path: Path to Excel file to write results to
     """
-    print("\n" + "="*50)
-    print("         CURRENT STOCK PRICES")
-    print("="*50)
-    
-    for ticker, price in results.items():
-        if isinstance(price, float):
-            print(f"{ticker:>8}: ${price:>10.2f}")
-        else:
-            print(f"{ticker:>8}: {price}")
-    
-    print("="*50)
+    try:
+        # Create DataFrame with all data
+        data_rows = []
+        for ticker in tickers:
+            stock_data = results.get(ticker, {})
+            row = {
+                'Ticker': ticker,
+                'Price': stock_data.get('Price', 'N/A'),
+                '52w_High': stock_data.get('52w_High', 'N/A'),
+                '52w_Low': stock_data.get('52w_Low', 'N/A'),
+                'MarketCap': stock_data.get('MarketCap', 'N/A'),
+                'PE_Ratio': stock_data.get('PE_Ratio', 'N/A')
+            }
+            data_rows.append(row)
+        
+        df = pd.DataFrame(data_rows)
+        
+        # Write to Excel using openpyxl engine
+        df.to_excel(file_path, engine='openpyxl', index=False)
+        
+        print(f"\n✓ Results written to {file_path}")
+        
+        # Print summary for user
+        print("\n" + "="*70)
+        print("         STOCK DATA SUMMARY")
+        print("="*70)
+        
+        for _, row in df.iterrows():
+            ticker = row['Ticker']
+            price = row['Price']
+            high_52w = row['52w_High']
+            low_52w = row['52w_Low']
+            market_cap = row['MarketCap']
+            pe_ratio = row['PE_Ratio']
+            
+            if isinstance(price, (int, float)):
+                print(f"{ticker:>8}: ${price:>10.2f} | 52w: ${high_52w:>8.2f}-${low_52w:>8.2f} | "
+                      f"Cap: {market_cap:>12.0f} | P/E: {pe_ratio:>6.2f}")
+            else:
+                print(f"{ticker:>8}: {str(price):>12} | Data: N/A")
+        
+        print("="*70)
+        
+    except Exception as e:
+        print(f"✗ Error writing results to Excel: {e}")
+        # Fall back to printing results
+        print("\n" + "="*50)
+        print("         STOCK DATA (Excel write failed)")
+        print("="*50)
+        for ticker, data in results.items():
+            print(f"{ticker}: {data}")
+        print("="*50)
 
 
 def main():
     """Main function to orchestrate the stock price fetching process"""
-    print("🚀 Stock Price Fetcher - Robinhood Edition")
+    print("🚀 Stock Data Fetcher - Robinhood Edition")
     print("="*50)
     
     # Check if credentials are set
@@ -146,11 +238,11 @@ def main():
     if not tickers:
         return
     
-    # Step 3: Fetch latest prices
-    results = fetch_stock_prices(tickers)
+    # Step 3: Fetch comprehensive stock data
+    results = fetch_stock_data(tickers)
     
-    # Step 4: Print results
-    print_results(results)
+    # Step 4: Write results to Excel
+    write_results_to_excel(tickers, results, TICKERS_FILE)
     
     # Logout
     try:
