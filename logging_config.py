@@ -135,7 +135,6 @@ def setup_logging(
 
 def get_web_logs() -> str:
     """Get captured logs for the web /logs endpoint."""
-    global _web_log_handler
     if _web_log_handler:
         return _web_log_handler.get_logs()
     return "No logs available - web capture not enabled"
@@ -143,7 +142,6 @@ def get_web_logs() -> str:
 
 def clear_web_logs():
     """Clear captured web logs."""
-    global _web_log_handler
     if _web_log_handler:
         _web_log_handler.clear()
 
