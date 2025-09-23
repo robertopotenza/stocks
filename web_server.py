@@ -17,6 +17,7 @@ import pandas as pd
 from stock_prices import main as run_stock_fetcher, fetch_stock_data, load_tickers_from_excel
 from ai_evaluation import evaluate_stock_portfolio, evaluate_stock_portfolio_with_sentiment
 from sentiment_analysis import analyze_portfolio_sentiment
+from combined_analysis import analyze_combined_portfolio
 from logging_config import setup_logging, get_web_logs, clear_web_logs, get_logger
 
 # Setup logging with web capture enabled
@@ -492,6 +493,158 @@ def get_demo_evaluation():
         logger.error(f"Error in demo evaluation: {e}")
         return jsonify({'error': f'Failed to perform demo evaluation: {str(e)}'}), 500
 
+@app.route('/demo-combined-analysis')
+def get_demo_combined_analysis():
+    """Get demo combined analysis using sample data for testing."""
+    logger.debug("Demo combined analysis endpoint accessed")
+    
+    try:
+        # Use the same sample data as demo evaluation
+        sample_tickers = ['AAPL', 'GOOGL', 'TSLA', 'NVDA', 'MSFT', 'META']
+        
+        logger.info("Running demo combined analysis with sample data")
+        
+        # We'll use the sample stock data and generate realistic sentiment data
+        sample_stock_data = {
+            'AAPL': {
+                'Price': 175.25,
+                '52w_High': 199.62,
+                '52w_Low': 124.17,
+                'MarketCap': 2750000000000,
+                'PE_Ratio': 28.5,
+                'Pivot_Support_1': 172.50,
+                'Pivot_Support_2': 168.75,
+                'Pivot_Resistance_1': 178.40,
+                'Pivot_Resistance_2': 182.15,
+                'Recent_Support': 170.25,
+                'Recent_Resistance': 180.60,
+                'Risk_Reward_Ratio': 2.3,
+                'Distance_from_52w_High_Pct': 12.2,
+                'Distance_from_52w_Low_Pct': 41.1,
+                'Upside_Potential_Pct': 18.5,
+                'Downside_Risk_Pct': 8.2,
+                'Valuation_Flag': 'Fair Value',
+                'Entry_Opportunity_Flag': 'Favorable',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'GOOGL': {
+                'Price': 2785.50,
+                '52w_High': 3030.93,
+                '52w_Low': 2193.62,
+                'MarketCap': 1850000000000,
+                'PE_Ratio': 24.8,
+                'Pivot_Support_1': 2750.25,
+                'Pivot_Support_2': 2690.80,
+                'Pivot_Resistance_1': 2820.75,
+                'Pivot_Resistance_2': 2880.40,
+                'Recent_Support': 2765.30,
+                'Recent_Resistance': 2810.90,
+                'Risk_Reward_Ratio': 1.8,
+                'Distance_from_52w_High_Pct': 8.1,
+                'Distance_from_52w_Low_Pct': 27.0,
+                'Upside_Potential_Pct': 12.8,
+                'Downside_Risk_Pct': 7.1,
+                'Valuation_Flag': 'Fair Value',
+                'Entry_Opportunity_Flag': 'Neutral',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'TSLA': {
+                'Price': 245.80,
+                '52w_High': 299.29,
+                '52w_Low': 138.80,
+                'MarketCap': 780000000000,
+                'PE_Ratio': 65.2,
+                'Pivot_Support_1': 235.60,
+                'Pivot_Support_2': 220.45,
+                'Pivot_Resistance_1': 260.25,
+                'Pivot_Resistance_2': 275.80,
+                'Recent_Support': 240.15,
+                'Recent_Resistance': 255.70,
+                'Risk_Reward_Ratio': 1.2,
+                'Distance_from_52w_High_Pct': 17.9,
+                'Distance_from_52w_Low_Pct': 77.1,
+                'Upside_Potential_Pct': 9.5,
+                'Downside_Risk_Pct': 8.1,
+                'Valuation_Flag': 'Overvalued',
+                'Entry_Opportunity_Flag': 'Unfavorable',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'NVDA': {
+                'Price': 118.75,
+                '52w_High': 140.76,
+                '52w_Low': 39.23,
+                'MarketCap': 2920000000000,
+                'PE_Ratio': 32.8,
+                'Pivot_Support_1': 115.20,
+                'Pivot_Support_2': 108.45,
+                'Pivot_Resistance_1': 125.30,
+                'Pivot_Resistance_2': 132.85,
+                'Recent_Support': 112.60,
+                'Recent_Resistance': 128.90,
+                'Risk_Reward_Ratio': 3.1,
+                'Distance_from_52w_High_Pct': 15.6,
+                'Distance_from_52w_Low_Pct': 202.6,
+                'Upside_Potential_Pct': 22.4,
+                'Downside_Risk_Pct': 7.2,
+                'Valuation_Flag': 'Overvalued',
+                'Entry_Opportunity_Flag': 'Favorable',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'MSFT': {
+                'Price': 415.30,
+                '52w_High': 468.35,
+                '52w_Low': 309.45,
+                'MarketCap': 3080000000000,
+                'PE_Ratio': 34.2,
+                'Pivot_Support_1': 405.85,
+                'Pivot_Support_2': 395.20,
+                'Pivot_Resistance_1': 425.75,
+                'Pivot_Resistance_2': 435.80,
+                'Recent_Support': 408.90,
+                'Recent_Resistance': 422.15,
+                'Risk_Reward_Ratio': 1.6,
+                'Distance_from_52w_High_Pct': 11.3,
+                'Distance_from_52w_Low_Pct': 34.2,
+                'Upside_Potential_Pct': 8.5,
+                'Downside_Risk_Pct': 5.3,
+                'Valuation_Flag': 'Overvalued',
+                'Entry_Opportunity_Flag': 'Neutral',
+                'Price_Level_Flag': 'Mid Range'
+            },
+            'META': {
+                'Price': 485.20,
+                '52w_High': 542.81,
+                '52w_Low': 279.70,
+                'MarketCap': 1240000000000,
+                'PE_Ratio': 22.1,
+                'Pivot_Support_1': 475.40,
+                'Pivot_Support_2': 465.85,
+                'Pivot_Resistance_1': 495.60,
+                'Pivot_Resistance_2': 510.25,
+                'Recent_Support': 478.30,
+                'Recent_Resistance': 492.80,
+                'Risk_Reward_Ratio': 2.8,
+                'Distance_from_52w_High_Pct': 10.6,
+                'Distance_from_52w_Low_Pct': 73.5,
+                'Upside_Potential_Pct': 16.2,
+                'Downside_Risk_Pct': 5.8,
+                'Valuation_Flag': 'Fair Value',
+                'Entry_Opportunity_Flag': 'Favorable',
+                'Price_Level_Flag': 'Mid Range'
+            }
+        }
+        
+        # Run combined analysis with sample data
+        combined_result = analyze_combined_portfolio(sample_tickers, sample_stock_data)
+        
+        logger.info(f"Demo combined analysis completed. Top recommendation: {combined_result.get('summary', {}).get('top_recommendation', {}).get('ticker', 'N/A')}")
+        
+        return jsonify(combined_result)
+        
+    except Exception as e:
+        logger.error(f"Error in demo combined analysis: {e}")
+        return jsonify({'error': f'Failed to perform demo combined analysis: {str(e)}'}), 500
+
 @app.route('/sentiment-analysis')
 def get_sentiment_analysis():
     """Get social media sentiment analysis for current tickers."""
@@ -567,6 +720,73 @@ def get_ticker_sentiment(ticker):
     except Exception as e:
         logger.error(f"Error in ticker sentiment analysis for {ticker}: {e}")
         return jsonify({'error': f'Failed to get sentiment for {ticker}: {str(e)}'}), 500
+
+@app.route('/combined-analysis')
+def get_combined_analysis():
+    """Get combined AI evaluation and sentiment analysis for unified stock rankings."""
+    logger.debug("Combined analysis endpoint accessed")
+    
+    try:
+        # Load tickers from Excel file
+        if not os.path.exists(TICKERS_FILE):
+            return jsonify({
+                'error': 'No ticker data available. Add some tickers first.'
+            }), 404
+        
+        # Read the Excel file to get tickers and any existing stock data
+        df = pd.read_excel(TICKERS_FILE)
+        
+        if 'Ticker' not in df.columns:
+            return jsonify({
+                'error': 'Invalid ticker file format.'
+            }), 400
+        
+        tickers = df['Ticker'].tolist()
+        
+        if not tickers:
+            return jsonify({
+                'error': 'No tickers found in the file.'
+            }), 400
+        
+        # Limit tickers to avoid overwhelming the APIs (max 10 for demo)
+        limited_tickers = tickers[:10]
+        
+        logger.info(f"Running combined analysis on {len(limited_tickers)} tickers")
+        
+        # Check if we have recent stock data in the Excel file
+        stock_data = None
+        required_columns = ['Price', 'PE_Ratio', '52w_High', '52w_Low']
+        
+        if all(col in df.columns for col in required_columns):
+            # Convert DataFrame to stock_data format
+            stock_data = {}
+            for _, row in df.iterrows():
+                ticker = row['Ticker']
+                if ticker in limited_tickers:
+                    # Convert row to dictionary, handling NaN values
+                    data = {}
+                    for col in df.columns:
+                        value = row[col]
+                        if pd.isna(value):
+                            data[col] = 'N/A'
+                        else:
+                            data[col] = value
+                    stock_data[ticker] = data
+            
+            logger.info(f"Using existing stock data from Excel file for {len(stock_data)} tickers")
+        else:
+            logger.info("No recent stock data found in Excel file, will fetch fresh data")
+        
+        # Run combined analysis
+        combined_result = analyze_combined_portfolio(limited_tickers, stock_data)
+        
+        logger.info(f"Combined analysis completed. Top recommendation: {combined_result.get('summary', {}).get('top_recommendation', {}).get('ticker', 'N/A')}")
+        
+        return jsonify(combined_result)
+        
+    except Exception as e:
+        logger.error(f"Error in combined analysis: {e}")
+        return jsonify({'error': f'Failed to perform combined analysis: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # Get port from environment (Railway, Heroku, etc.)
