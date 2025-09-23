@@ -2,6 +2,60 @@
 
 A Python script that fetches comprehensive stock data from Robinhood for a list of tickers stored in an Excel file, then writes the results back to the Excel file with additional stock information.
 
+## 🚀 Quick Start (Easiest Way)
+
+**🎭 Want to see how it works first? Try the demo (no credentials needed):**
+
+```bash
+python demo.py
+```
+
+**🚀 Ready to run with real data? Use this one command:**
+
+**Linux/Mac:**
+```bash
+./start.sh
+```
+
+**Windows:**
+```cmd
+start.bat
+```
+
+That's it! This script will:
+- ✅ Check your Python installation  
+- ✅ Install required packages automatically
+- ✅ Guide you through credential setup step-by-step
+- ✅ Create a sample tickers file
+- ✅ Run the application
+
+**Alternative quick commands:**
+```bash
+# 🎭 Demo mode (no credentials needed)
+python demo.py
+
+# 🌟 Easy interactive setup
+python setup.py
+
+# ⚡ Smart run with helpful guidance  
+python run.py
+
+# 📊 Traditional way (after setup)
+python stock_prices.py
+```
+
+## 🛠️ New Easy-to-Use Scripts
+
+This repository now includes several helper scripts to make running the application as easy as possible:
+
+| Script | Purpose | When to Use |
+|--------|---------|-------------|
+| `./start.sh` | **One-command setup and run** | First time users - handles everything automatically |
+| `python demo.py` | **Demo with mock data** | Want to see how it works without credentials |
+| `python setup.py` | **Interactive setup wizard** | Need help configuring credentials and files |
+| `python run.py` | **Smart runner with guidance** | Regular use - provides helpful error messages |
+| `python stock_prices.py` | **Original script** | Direct use after manual setup |
+
 ## Features
 
 - Fetches comprehensive stock data using the Robinhood API including:

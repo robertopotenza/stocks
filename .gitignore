@@ -108,6 +108,12 @@ dmypy.json
 # Configuration files with credentials
 config.py
 
+# Setup and demo files that shouldn't be committed
+setup_complete.flag
+run_with_env.sh
+demo_*.xlsx
+demo_results.xlsx
+
 # IDE files
 .vscode/
 .idea/
