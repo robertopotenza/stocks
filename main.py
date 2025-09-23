@@ -10,6 +10,10 @@ mode and worker mode based on environment variables.
 import os
 import subprocess
 import sys
+from logging_config import get_logger
+
+# Get logger instance
+logger = get_logger('stocks_app.main')
 
 def main():
     """Main entry point that decides between web server and worker mode."""
@@ -23,11 +27,11 @@ def main():
         
         if is_production:
             # Use gunicorn for production
-            print(f"🌐 Starting Stock Data Fetcher Web Server (Production) on port {port}")
-            print("📡 Health check available at: /")
-            print("🚀 Trigger job at: /run")
-            print("📊 Check status at: /status")
-            print("📝 View logs at: /logs")
+            logger.info(f"🌐 Starting Stock Data Fetcher Web Server (Production) on port {port}")
+            logger.info("📡 Health check available at: /")
+            logger.info("🚀 Trigger job at: /run")
+            logger.info("📊 Check status at: /status")
+            logger.info("📝 View logs at: /logs")
             
             # Run gunicorn
             cmd = [
@@ -45,17 +49,17 @@ def main():
             # Use Flask development server
             from web_server import app
             
-            print(f"🌐 Starting Stock Data Fetcher Web Server (Development) on port {port}")
-            print("📡 Health check available at: /")
-            print("🚀 Trigger job at: /run")
-            print("📊 Check status at: /status")
-            print("📝 View logs at: /logs")
+            logger.info(f"🌐 Starting Stock Data Fetcher Web Server (Development) on port {port}")
+            logger.info("📡 Health check available at: /")
+            logger.info("🚀 Trigger job at: /run")
+            logger.info("📊 Check status at: /status")
+            logger.info("📝 View logs at: /logs")
             
             app.run(host='0.0.0.0', port=port, debug=True)
     else:
         # Run the original worker script
         from stock_prices import main as run_stock_fetcher
-        print("🔄 Running in worker mode...")
+        logger.info("🔄 Running in worker mode...")
         run_stock_fetcher()
 
 if __name__ == "__main__":

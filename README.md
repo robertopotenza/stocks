@@ -100,6 +100,55 @@ The script will:
 6. Write results back to the Excel file with new columns
 7. Display formatted summary of results including technical levels
 
+## Logging Configuration
+
+The application now uses a comprehensive logging system with configurable levels and rotating logs.
+
+### Environment Variables
+
+- **`LOG_LEVEL`**: Set the logging verbosity level (default: `INFO`)
+  - `DEBUG`: Most detailed logging (includes all messages)
+  - `INFO`: General information messages (recommended)
+  - `WARNING`: Warning messages and above
+  - `ERROR`: Error messages only
+  - `CRITICAL`: Critical errors only
+
+### Examples
+
+```bash
+# Run with debug logging
+LOG_LEVEL=DEBUG python stock_prices.py
+
+# Run with minimal logging (errors only)
+LOG_LEVEL=ERROR python stock_prices.py
+
+# Default (INFO level)
+python stock_prices.py
+```
+
+### Log Features
+
+- **Console Logging**: All log messages are displayed in the console with timestamps
+- **File Logging**: Automatic log files with rotation (10MB max, 5 backup files)
+- **Web Logs**: For web server mode, logs are captured and available via `/logs` endpoint
+- **Rotating Buffer**: Web logs use a rotating buffer (1000 lines max) to prevent memory issues
+- **Structured Format**: `YYYY-MM-DD HH:MM:SS - module - LEVEL - message`
+
+### Web Server Logging
+
+When running in web server mode, additional logging features are available:
+
+- **`GET /logs`**: View captured application logs with automatic rotation
+- **Real-time capture**: All application logs are captured and made available through the web interface
+- **Memory efficient**: Uses rotating buffer to limit memory usage
+
+Example log output:
+```
+2025-09-23 03:35:13 - stocks_app.stock_prices - INFO - 🚀 Stock Data Fetcher - Robinhood Edition  
+2025-09-23 03:35:13 - stocks_app.stock_prices - INFO - Loaded 8 tickers from tickers.xlsx
+2025-09-23 03:35:13 - stocks_app.stock_prices - WARNING - Please set your Robinhood credentials!
+```
+
 ## Example Output
 
 ```

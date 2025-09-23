@@ -11,6 +11,10 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Tuple, Any
 import robin_stocks.robinhood as r
+from logging_config import get_logger
+
+# Get logger instance
+logger = get_logger('stocks_app.technical_analysis')
 
 
 def get_historical_data(ticker: str, interval: str = 'day', span: str = '3month') -> List[Dict[str, Any]]:
@@ -59,7 +63,7 @@ def get_historical_data(ticker: str, interval: str = 'day', span: str = '3month'
         return clean_data
         
     except Exception as e:
-        print(f"Error fetching historical data for {ticker}: {e}")
+        logger.error(f"Error fetching historical data for {ticker}: {e}")
         return []
 
 
@@ -107,7 +111,7 @@ def calculate_pivot_points(data: List[Dict[str, Any]]) -> Dict[str, float]:
         }
         
     except Exception as e:
-        print(f"Error calculating pivot points: {e}")
+        logger.error(f"Error calculating pivot points: {e}")
         return {}
 
 
@@ -168,7 +172,7 @@ def find_recent_support_resistance(data: List[Dict[str, Any]], lookback_days: in
         return result
         
     except Exception as e:
-        print(f"Error finding recent support/resistance: {e}")
+        logger.error(f"Error finding recent support/resistance: {e}")
         return {}
 
 

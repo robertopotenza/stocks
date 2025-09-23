@@ -14,6 +14,10 @@ import time
 from datetime import datetime
 from flask import Flask, jsonify, request
 from stock_prices import main as run_stock_fetcher
+from logging_config import setup_logging, get_web_logs, clear_web_logs, get_logger
+
+# Setup logging with web capture enabled
+logger = setup_logging('stocks_app.web_server', enable_web_capture=True)
 
 app = Flask(__name__)
 
@@ -31,28 +35,33 @@ def run_stock_fetcher_async():
         job_status['status'] = 'running'
         job_status['last_error'] = None
         
-        # Capture stdout to log the output
-        import io
-        import contextlib
+        logger.info("Starting stock fetcher job")
         
-        f = io.StringIO()
-        with contextlib.redirect_stdout(f):
-            run_stock_fetcher()
+        # Clear previous logs for this run
+        clear_web_logs()
         
-        output = f.getvalue()
+        # Run the stock fetcher (logs will be captured automatically)
+        run_stock_fetcher()
+        
+        # Get captured output
+        output = get_web_logs()
         
         job_status['status'] = 'completed'
         job_status['last_run'] = datetime.now().isoformat()
         job_status['run_count'] += 1
         job_status['last_output'] = output
         
+        logger.info("Stock fetcher job completed successfully")
+        
     except Exception as e:
         job_status['status'] = 'error'
         job_status['last_error'] = str(e)
+        logger.error(f"Stock fetcher job failed: {e}")
 
 @app.route('/')
 def health_check():
     """Health check endpoint for load balancers."""
+    logger.debug("Health check endpoint accessed")
     return jsonify({
         'status': 'healthy',
         'service': 'Stock Data Fetcher',
@@ -69,10 +78,13 @@ def favicon():
 def run_job():
     """Trigger the stock fetching job."""
     if job_status['status'] == 'running':
+        logger.warning("Job start requested but job is already running")
         return jsonify({
             'error': 'Job is already running',
             'status': job_status
         }), 409
+    
+    logger.info("Starting stock fetching job via web endpoint")
     
     # Start the job in a background thread
     thread = threading.Thread(target=run_stock_fetcher_async)
@@ -87,20 +99,28 @@ def run_job():
 @app.route('/status')
 def get_status():
     """Get the current job status."""
+    logger.debug("Status endpoint accessed")
     return jsonify(job_status)
 
 @app.route('/logs')
 def get_logs():
-    """Get the last job output."""
-    if 'last_output' in job_status:
+    """Get the last job output with rotating logs."""
+    logger.debug("Logs endpoint accessed")
+    
+    # Get logs from our rotating log handler
+    captured_logs = get_web_logs()
+    
+    if captured_logs or 'last_output' in job_status:
         return jsonify({
             'status': job_status['status'],
             'last_run': job_status['last_run'],
-            'output': job_status['last_output']
+            'output': captured_logs or job_status.get('last_output', ''),
+            'log_source': 'rotating_logs' if captured_logs else 'legacy_output'
         })
     else:
         return jsonify({
-            'message': 'No logs available yet'
+            'message': 'No logs available yet',
+            'status': job_status['status']
         })
 
 if __name__ == '__main__':
@@ -111,14 +131,14 @@ if __name__ == '__main__':
     web_mode = os.environ.get('WEB_MODE', 'true').lower() == 'true'
     
     if web_mode:
-        print(f"🌐 Starting Stock Data Fetcher Web Server on port {port}")
-        print("📡 Health check available at: /")
-        print("🚀 Trigger job at: /run")
-        print("📊 Check status at: /status")
-        print("📝 View logs at: /logs")
+        logger.info(f"🌐 Starting Stock Data Fetcher Web Server on port {port}")
+        logger.info("📡 Health check available at: /")
+        logger.info("🚀 Trigger job at: /run")
+        logger.info("📊 Check status at: /status")
+        logger.info("📝 View logs at: /logs")
         
         app.run(host='0.0.0.0', port=port)
     else:
         # Fall back to running the original script
-        print("🔄 Running in worker mode...")
+        logger.info("🔄 Running in worker mode...")
         run_stock_fetcher()
