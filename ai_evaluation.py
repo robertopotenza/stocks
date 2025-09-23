@@ -485,13 +485,15 @@ def evaluate_stock_portfolio(stock_data: Dict[str, Dict[str, Any]]) -> Dict[str,
 
 
 def evaluate_stock_portfolio_with_sentiment(stock_data: Dict[str, Dict[str, Any]], 
-                                           include_sentiment: bool = True) -> Dict[str, Any]:
+                                           include_sentiment: bool = True,
+                                           sentiment_data: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Enhanced function to evaluate a portfolio of stocks with optional sentiment analysis.
     
     Args:
         stock_data: Dictionary mapping ticker to stock data
         include_sentiment: Whether to include sentiment analysis
+        sentiment_data: Optional pre-fetched sentiment data
         
     Returns:
         Dictionary containing ranked stocks and portfolio summary with sentiment data
@@ -503,17 +505,21 @@ def evaluate_stock_portfolio_with_sentiment(stock_data: Dict[str, Dict[str, Any]
     # Get list of tickers for sentiment analysis
     tickers = list(stock_data.keys())
     
-    # Fetch sentiment data if requested
+    # Use provided sentiment data or fetch fresh data if requested
     sentiment_results = {}
     if include_sentiment and tickers:
-        try:
-            logger.info(f"📱 Analyzing social media sentiment for {len(tickers)} tickers...")
-            portfolio_sentiment = analyze_portfolio_sentiment(tickers, days=5)
-            sentiment_results = portfolio_sentiment.get('sentiment_data', {})
-            logger.info(f"✅ Sentiment analysis completed for {len(sentiment_results)} tickers")
-        except Exception as e:
-            logger.warning(f"Failed to fetch sentiment data: {e}")
-            sentiment_results = {}
+        if sentiment_data:
+            logger.info("📱 Using provided sentiment analysis data...")
+            sentiment_results = sentiment_data.get('sentiment_data', {})
+        else:
+            try:
+                logger.info(f"📱 Analyzing social media sentiment for {len(tickers)} tickers...")
+                portfolio_sentiment = analyze_portfolio_sentiment(tickers, days=5)
+                sentiment_results = portfolio_sentiment.get('sentiment_data', {})
+                logger.info(f"✅ Sentiment analysis completed for {len(sentiment_results)} tickers")
+            except Exception as e:
+                logger.warning(f"Failed to fetch sentiment data: {e}")
+                sentiment_results = {}
     
     # Integrate sentiment data into stock data
     enhanced_stock_data = {}

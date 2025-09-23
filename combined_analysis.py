@@ -38,13 +38,15 @@ class CombinedStockAnalyzer:
             'avoid': 40          # Avoid < 40
         }
     
-    def analyze_portfolio(self, tickers: List[str], stock_data: Dict[str, Dict[str, Any]] = None) -> Dict[str, Any]:
+    def analyze_portfolio(self, tickers: List[str], stock_data: Dict[str, Dict[str, Any]] = None, 
+                         sentiment_data: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Perform combined analysis on a portfolio of stocks.
         
         Args:
             tickers: List of stock ticker symbols to analyze
             stock_data: Optional pre-fetched stock data (if None, will be fetched)
+            sentiment_data: Optional pre-fetched sentiment data (if None, will be fetched)
             
         Returns:
             Dictionary containing combined analysis results with unified rankings
@@ -65,9 +67,13 @@ class CombinedStockAnalyzer:
             
             logger.info(f"✅ AI evaluation completed for {len(ai_results.get('ranked_stocks', []))} stocks")
             
-            # Step 2: Get sentiment analysis results
-            logger.info("📱 Running social media sentiment analysis...")
-            sentiment_results = analyze_portfolio_sentiment(tickers, days=5)
+            # Step 2: Get sentiment analysis results (use provided data or fetch fresh)
+            if sentiment_data:
+                logger.info("📱 Using provided sentiment analysis data...")
+                sentiment_results = sentiment_data
+            else:
+                logger.info("📱 Running social media sentiment analysis...")
+                sentiment_results = analyze_portfolio_sentiment(tickers, days=5)
             
             logger.info(f"✅ Sentiment analysis completed for {len(sentiment_results.get('sentiment_data', {}))} tickers")
             
@@ -382,16 +388,18 @@ class CombinedStockAnalyzer:
         }
 
 
-def analyze_combined_portfolio(tickers: List[str], stock_data: Dict[str, Dict[str, Any]] = None) -> Dict[str, Any]:
+def analyze_combined_portfolio(tickers: List[str], stock_data: Dict[str, Dict[str, Any]] = None, 
+                              sentiment_data: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Convenience function to run combined portfolio analysis.
     
     Args:
         tickers: List of stock ticker symbols
         stock_data: Optional pre-fetched stock data
+        sentiment_data: Optional pre-fetched sentiment data
         
     Returns:
         Combined analysis results
     """
     analyzer = CombinedStockAnalyzer()
-    return analyzer.analyze_portfolio(tickers, stock_data)
+    return analyzer.analyze_portfolio(tickers, stock_data, sentiment_data)
