@@ -1,5 +1,6 @@
 # Use Python 3.12 slim image for smaller footprint
-FROM python:3.12-slim
+# Using Amazon ECR public registry to avoid Docker Hub authentication issues
+FROM public.ecr.aws/docker/library/python:3.12-slim
 
 # Set working directory
 WORKDIR /app

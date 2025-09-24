@@ -75,6 +75,8 @@ docker run --dns=8.8.8.8 --dns=1.1.1.1 \
 
 **Important**: Never modify `/etc/resolv.conf` or `/etc/hosts` in Dockerfile - they are read-only in modern Docker containers. Use runtime configuration instead.
 
+**Note**: The Dockerfiles use Amazon ECR Public Registry (`public.ecr.aws/docker/library/python:3.12-slim`) instead of Docker Hub to avoid authentication issues. See `DOCKER_HUB_AUTH_FIX.md` for details.
+
 ## Setup
 
 ### Method 1: Environment Variables (Recommended)
