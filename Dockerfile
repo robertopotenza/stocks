@@ -74,8 +74,9 @@ RUN python -c "import nltk; nltk.download('vader_lexicon', quiet=True)"
 COPY . .
 
 # Network configuration fixes
-# Note: DNS and hosts configuration should be done at runtime
+# IMPORTANT: DNS and hosts configuration should be done at runtime
 # using docker-compose dns settings or --dns and --add-host flags
+# DO NOT modify /etc/resolv.conf or /etc/hosts in Docker build - they are read-only
 
 # Create a non-root user for security
 RUN useradd --create-home --shell /bin/bash app
