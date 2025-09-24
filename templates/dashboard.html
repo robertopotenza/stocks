@@ -37,13 +37,18 @@
                     </div>
                     <div class="card-body">
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <button id="start-job-btn" class="btn btn-primary w-100" onclick="startJob()">
                                     <i class="fas fa-play me-2"></i>Start Data Fetch
                                 </button>
                             </div>
-                            <div class="col-md-6">
-                                <div class="d-flex align-items-center">
+                            <div class="col-md-4">
+                                <button id="run-all-btn" class="btn btn-success w-100" onclick="runAllAnalysis()">
+                                    <i class="fas fa-bolt me-2"></i>Run All
+                                </button>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="d-flex align-items-center h-100">
                                     <div class="flex-grow-1">
                                         <small class="text-muted">Status:</small>
                                         <div id="job-status" class="fw-bold">Ready</div>
