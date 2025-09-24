@@ -314,7 +314,7 @@ class TechnicalIndicatorsExtractor:
             bool: True if login successful or no credentials provided, False if login failed
         """
         # Skip login if no credentials or already logged in
-        if not self.investing_login or not self.investing_password:
+        if not (self.investing_login and self.investing_login.strip() and self.investing_password and self.investing_password.strip()):
             logger.debug("No Investing.com credentials provided - skipping login")
             return True
         
