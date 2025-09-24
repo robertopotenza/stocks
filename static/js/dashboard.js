@@ -148,6 +148,87 @@ async function startJob() {
     }
 }
 
+// Run all analysis - comprehensive workflow that starts data fetch, waits for completion, then runs combined analysis
+async function runAllAnalysis() {
+    const runAllButton = document.getElementById('run-all-btn');
+    const startJobButton = document.getElementById('start-job-btn');
+    
+    try {
+        // Disable buttons to prevent multiple runs
+        runAllButton.disabled = true;
+        startJobButton.disabled = true;
+        runAllButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Running...';
+        
+        showSuccess('Starting comprehensive analysis workflow...');
+        
+        // Step 1: Start the background data fetch job
+        showSuccess('Step 1/3: Starting background data fetch...');
+        const runResponse = await fetch('/run');
+        if (!runResponse.ok) {
+            throw new Error(`Failed to start job: ${runResponse.status}`);
+        }
+        
+        const runData = await runResponse.json();
+        if (runData.error) {
+            throw new Error(runData.error);
+        }
+        
+        showSuccess('Background job started. Waiting for completion...');
+        
+        // Step 2: Poll until job completes or fails
+        let jobCompleted = false;
+        let pollAttempts = 0;
+        const maxPollAttempts = 120; // 10 minutes max (5s intervals)
+        
+        while (!jobCompleted && pollAttempts < maxPollAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+            pollAttempts++;
+            
+            const statusResponse = await fetch('/status');
+            if (!statusResponse.ok) {
+                throw new Error(`Failed to check status: ${statusResponse.status}`);
+            }
+            
+            const statusData = await statusResponse.json();
+            updateStatusDisplay(statusData);
+            
+            if (statusData.status === 'completed') {
+                jobCompleted = true;
+                showSuccess('Step 2/3: Background data fetch completed successfully!');
+            } else if (statusData.status === 'error') {
+                throw new Error(`Background job failed: ${statusData.last_error || 'Unknown error'}`);
+            } else if (statusData.status === 'running') {
+                showSuccess(`Background job still running... (${pollAttempts * 5}s elapsed)`);
+                // Refresh logs to show progress
+                loadLogs();
+            }
+        }
+        
+        if (!jobCompleted) {
+            throw new Error('Background job timed out after 10 minutes');
+        }
+        
+        // Step 3: Run the combined analysis
+        showSuccess('Step 3/3: Running comprehensive analysis...');
+        await runRoutineAnalysis();
+        
+        // Refresh logs and status one final time
+        await loadLogs();
+        await refreshStatus();
+        
+        showSuccess('✅ Complete! All analysis finished successfully.');
+        
+    } catch (error) {
+        console.error('Error in run all analysis:', error);
+        showError('Run All failed: ' + error.message);
+    } finally {
+        // Re-enable buttons
+        runAllButton.disabled = false;
+        startJobButton.disabled = false;
+        runAllButton.innerHTML = '<i class="fas fa-magic me-2"></i>Run All';
+    }
+}
+
 // Load ticker count for summary display
 async function loadTickerCount() {
     try {
