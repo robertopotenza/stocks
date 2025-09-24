@@ -103,7 +103,7 @@ class TechnicalIndicatorsExtractor:
             headers = self._get_headers()
             
             # Enhanced error reporting for production debugging
-            logger.debug(f"Attempting to fetch {url}")
+            logger.info(f"📡 Attempting to fetch {url} using HTTP requests")
             logger.debug(f"Request headers: {headers}")
             logger.debug(f"Timeout: {self.timeout}s")
             
@@ -157,7 +157,7 @@ class TechnicalIndicatorsExtractor:
         if not self.driver:
             self.driver = self._setup_selenium_driver()
             if not self.driver:
-                logger.debug("Selenium driver not available, skipping")
+                logger.info("🚫 Selenium driver not available, skipping Selenium method")
                 return None
         
         if url in self.page_cache:
@@ -165,6 +165,7 @@ class TechnicalIndicatorsExtractor:
             return self.page_cache[url]
             
         try:
+            logger.info(f"🤖 Attempting to fetch {url} using Selenium WebDriver")
             self.driver.get(url)
             
             # Wait for page to load with shorter timeout
@@ -503,8 +504,10 @@ class TechnicalIndicatorsExtractor:
         soup = None
         
         # First try with requests (faster)
+        logger.info(f"🌐 Attempting to extract {ticker} using HTTP requests method")
         soup = self._extract_with_requests(url)
         if soup:
+            logger.info(f"✅ HTTP requests method successful for {ticker}")
             indicators = self._extract_indicators_investing_com(soup, ticker)
             # Check if we got meaningful data
             meaningful_data = sum(1 for v in indicators.values() if v != 'N/A')
@@ -514,8 +517,10 @@ class TechnicalIndicatorsExtractor:
                 result['data_quality'] = 'partial'
         else:
             # Fallback to Selenium
+            logger.info(f"❌ HTTP requests method failed for {ticker}, attempting Selenium method")
             soup = self._extract_with_selenium(url)
             if soup:
+                logger.info(f"✅ Selenium method successful for {ticker}")
                 indicators = self._extract_indicators_investing_com(soup, ticker)
                 meaningful_data = sum(1 for v in indicators.values() if v != 'N/A')
                 if meaningful_data >= 3:
@@ -525,6 +530,7 @@ class TechnicalIndicatorsExtractor:
                 result['notes'] = 'Used Selenium fallback'
             else:
                 # Network failure - use mock data for testing
+                logger.info(f"❌ Selenium method failed for {ticker}, falling back to mock data")
                 logger.warning(f"Network unavailable for {ticker}, using mock data for testing")
                 logger.warning("This indicates a production issue that needs immediate attention:")
                 logger.warning("  1. DNS resolution failure for investing.com")
