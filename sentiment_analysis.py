@@ -239,9 +239,14 @@ class RedditSentimentFetcher:
         neg_pct = (negative / mentions * 100) if mentions > 0 else 0.0
         neu_pct = (neutral / mentions * 100) if mentions > 0 else 0.0
         
-        # Calculate overall score
-        overall_score = (positive - negative) / mentions if mentions > 0 else 0.0
-        standardized_score = ((overall_score + 1) / 2) * 100
+        # Calculate net positivity score using normalized 0-100 scale
+        # Formula: (% Positive - % Negative + 100) / 2
+        if mentions > 0:
+            overall_score = (positive - negative) / mentions  # Keep original -1 to 1 for compatibility
+            standardized_score = (pos_pct - neg_pct + 100) / 2  # Net positivity formula
+        else:
+            overall_score = 0.0
+            standardized_score = 50.0  # Neutral on 0-100 scale
         
         # Determine trend
         if standardized_score > 60:
@@ -478,9 +483,14 @@ class TwitterSentimentFetcher:
         neg_pct = (negative / mentions * 100) if mentions > 0 else 0.0
         neu_pct = (neutral / mentions * 100) if mentions > 0 else 0.0
         
-        # Calculate overall score
-        overall_score = (positive - negative) / mentions if mentions > 0 else 0.0
-        standardized_score = ((overall_score + 1) / 2) * 100
+        # Calculate net positivity score using normalized 0-100 scale
+        # Formula: (% Positive - % Negative + 100) / 2
+        if mentions > 0:
+            overall_score = (positive - negative) / mentions  # Keep original -1 to 1 for compatibility
+            standardized_score = (pos_pct - neg_pct + 100) / 2  # Net positivity formula
+        else:
+            overall_score = 0.0
+            standardized_score = 50.0  # Neutral on 0-100 scale
         
         # Determine trend
         if standardized_score > 60:
@@ -717,13 +727,14 @@ class SocialMediaSentimentAnalyzer:
         neg_pct = (negative / mentions * 100) if mentions > 0 else 0.0
         neu_pct = (neutral / mentions * 100) if mentions > 0 else 0.0
         
-        # Calculate overall score (-1 to 1 scale)
+        # Calculate net positivity score using normalized 0-100 scale
+        # Formula: (% Positive - % Negative + 100) / 2
         if mentions > 0:
-            overall_score = (positive - negative) / mentions
-            standardized_score = ((overall_score + 1) / 2) * 100  # Convert to 0-100 scale
+            overall_score = (positive - negative) / mentions  # Keep original -1 to 1 for compatibility
+            standardized_score = (pos_pct - neg_pct + 100) / 2  # Net positivity formula
         else:
             overall_score = 0.0
-            standardized_score = 50.0
+            standardized_score = 50.0  # Neutral on 0-100 scale
         
         # Determine trend direction
         if standardized_score > 60:
