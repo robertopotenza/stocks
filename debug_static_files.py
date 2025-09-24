@@ -9,7 +9,22 @@ static folder exists as expected.
 This helps confirm whether the problem is the image or the platform serving responses.
 
 Usage:
+    # Basic health check with detailed output
     python debug_static_files.py
+    
+    # JSON output for automation/monitoring
+    python debug_static_files.py --json
+    
+    # In Docker container
+    docker exec <container> python /app/debug_static_files.py
+
+Exit codes:
+    0 - All checks passed (healthy)
+    1 - Issues detected (unhealthy)
+
+Example output:
+    🏥 OVERALL HEALTH: ✅ HEALTHY (when all files are correct)
+    🏥 OVERALL HEALTH: ❌ ISSUES DETECTED (when problems found)
 """
 
 import os
@@ -28,18 +43,21 @@ class StaticFilesDebugger:
         self.app_dir = Path(__file__).parent.absolute()
         self.static_dir = self.app_dir / "static"
         self.results = {}
+        self.quiet = False
     
     def print_header(self, title: str):
         """Print formatted header."""
-        print(f"\n{'='*60}")
-        print(f" {title}")
-        print(f"{'='*60}")
+        if not self.quiet:
+            print(f"\n{'='*60}")
+            print(f" {title}")
+            print(f"{'='*60}")
     
     def print_section(self, title: str):
         """Print formatted section header."""
-        print(f"\n{'-'*40}")
-        print(f" {title}")
-        print(f"{'-'*40}")
+        if not self.quiet:
+            print(f"\n{'-'*40}")
+            print(f" {title}")
+            print(f"{'-'*40}")
     
     def get_file_owner_info(self, file_path: Path) -> Dict[str, str]:
         """Get file owner and group information."""
@@ -95,28 +113,33 @@ class StaticFilesDebugger:
         print(f"Static Directory: {results['static_dir']}")
         
         if results['static_exists']:
-            print(f"✅ Static directory exists: {self.static_dir}")
+            if not self.quiet:
+                print(f"✅ Static directory exists: {self.static_dir}")
             
             if results['static_is_dir']:
-                print(f"✅ Static path is a directory")
+                if not self.quiet:
+                    print(f"✅ Static path is a directory")
                 
                 # Get permissions for static directory
                 perms = self.get_file_permissions(self.static_dir)
                 owner_info = self.get_file_owner_info(self.static_dir)
                 
-                print(f"   Permissions: {perms.get('permissions', 'unknown')}")
-                print(f"   Owner: {owner_info.get('owner', 'unknown')}:{owner_info.get('group', 'unknown')}")
-                print(f"   Readable: {perms.get('readable', False)}")
-                print(f"   Executable: {perms.get('executable', False)}")
+                if not self.quiet:
+                    print(f"   Permissions: {perms.get('permissions', 'unknown')}")
+                    print(f"   Owner: {owner_info.get('owner', 'unknown')}:{owner_info.get('group', 'unknown')}")
+                    print(f"   Readable: {perms.get('readable', False)}")
+                    print(f"   Executable: {perms.get('executable', False)}")
                 
                 results.update({
                     'permissions': perms,
                     'owner_info': owner_info
                 })
             else:
-                print(f"❌ Static path exists but is not a directory")
+                if not self.quiet:
+                    print(f"❌ Static path exists but is not a directory")
         else:
-            print(f"❌ Static directory does not exist: {self.static_dir}")
+            if not self.quiet:
+                print(f"❌ Static directory does not exist: {self.static_dir}")
         
         self.results['static_directory'] = results
         return results
@@ -359,12 +382,15 @@ class StaticFilesDebugger:
             'recommendations': recommendations
         }
     
-    def run_debug(self):
+    def run_debug(self, quiet=False):
         """Run complete static files debug suite."""
-        self.print_header("STATIC FILES DEBUG REPORT")
-        print("Checking Flask static files configuration and permissions...")
-        print(f"Script location: {__file__}")
-        print(f"App directory: {self.app_dir}")
+        self.quiet = quiet
+        
+        if not quiet:
+            self.print_header("STATIC FILES DEBUG REPORT")
+            print("Checking Flask static files configuration and permissions...")
+            print(f"Script location: {__file__}")
+            print(f"App directory: {self.app_dir}")
         
         # Run all checks
         self.check_current_user()
@@ -373,7 +399,53 @@ class StaticFilesDebugger:
         self.check_flask_configuration()
         
         # Generate summary
-        summary = self.generate_summary()
+        if not quiet:
+            summary = self.generate_summary()
+        else:
+            # Generate summary silently for JSON output
+            issues = []
+            recommendations = []
+            
+            # Check issues without printing
+            static_dir_results = self.results.get('static_directory', {})
+            if not static_dir_results.get('static_exists'):
+                issues.append("Static directory does not exist")
+                recommendations.append("Create static directory with proper permissions")
+            elif not static_dir_results.get('static_is_dir'):
+                issues.append("Static path exists but is not a directory")
+                recommendations.append("Remove conflicting file and create static directory")
+            
+            static_files_results = self.results.get('static_files', {})
+            missing_files = []
+            unreadable_files = []
+            
+            for file_path, file_info in static_files_results.items():
+                if not file_info.get('exists'):
+                    missing_files.append(file_path)
+                elif not file_info.get('readable_content', True):
+                    unreadable_files.append(file_path)
+            
+            if missing_files:
+                issues.append(f"Missing static files: {', '.join(missing_files)}")
+                recommendations.append("Ensure all required static files are present in the image")
+            
+            if unreadable_files:
+                issues.append(f"Unreadable static files: {', '.join(unreadable_files)}")
+                recommendations.append("Check file permissions for static files")
+            
+            flask_results = self.results.get('flask_configuration', {})
+            if not flask_results.get('flask_import'):
+                issues.append("Cannot import Flask application")
+                recommendations.append("Check Flask application and dependencies")
+            elif not flask_results.get('static_path_correct'):
+                issues.append("Flask static folder configuration mismatch")
+                recommendations.append("Verify Flask static folder configuration")
+            
+            summary = {
+                'healthy': len(issues) == 0,
+                'issues': issues,
+                'recommendations': recommendations
+            }
         
         return {
             'summary': summary,
@@ -391,11 +463,10 @@ def main():
     args = parser.parse_args()
     
     debugger = StaticFilesDebugger()
-    results = debugger.run_debug()
+    results = debugger.run_debug(quiet=args.json)
     
     if args.json:
         import json
-        print("\n" + "="*60)
         print(json.dumps(results, indent=2, default=str))
     
     # Exit with appropriate code
