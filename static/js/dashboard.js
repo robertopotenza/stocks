@@ -547,11 +547,7 @@ function displayAIEvaluation(data) {
         tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No stocks to display</td></tr>';
         if (rankingsContainer) rankingsContainer.style.display = 'block';
     }
-    
-    // Display sentiment summary if available
-    if (data.sentiment_summary) {
-        displaySentimentSummary(data.sentiment_summary);
-    }
+
 }
 
 // Helper functions for AI evaluation display
@@ -746,58 +742,7 @@ function displayStandaloneSentiment(data) {
     }
 }
 
-// Display sentiment summary (when integrated with AI evaluation)
-function displaySentimentSummary(sentimentSummary) {
-    const sentimentSection = document.getElementById('sentiment-summary-section');
-    
-    if (!sentimentSection || !sentimentSummary) return;
-    
-    // Update summary metrics
-    const totalMentions = document.getElementById('total-mentions');
-    const mostPositive = document.getElementById('most-positive-ticker');
-    const mostNegative = document.getElementById('most-negative-ticker');
-    const avgSentiment = document.getElementById('average-sentiment');
-    
-    if (totalMentions) totalMentions.textContent = sentimentSummary.total_mentions_across_portfolio || 0;
-    if (mostPositive) mostPositive.textContent = sentimentSummary.most_positive_ticker || '-';
-    if (mostNegative) mostNegative.textContent = sentimentSummary.most_negative_ticker || '-';
-    if (avgSentiment) avgSentiment.textContent = sentimentSummary.average_standardized_sentiment_score || sentimentSummary.average_sentiment_score || '50.0';
-    
-    // Populate sentiment table
-    const tbody = document.getElementById('sentiment-rankings-tbody');
-    if (tbody && sentimentSummary.sentiment_data) {
-        const sentimentArray = Object.entries(sentimentSummary.sentiment_data)
-            .map(([ticker, sentimentData]) => ({ ticker, ...sentimentData }))
-            .sort((a, b) => (b.standardized_sentiment_score || b.overall_sentiment_score || 0) - (a.standardized_sentiment_score || a.overall_sentiment_score || 0));
-        
-        tbody.innerHTML = sentimentArray.map(item => {
-            const standardizedScore = item.standardized_sentiment_score || ((item.overall_sentiment_score + 1) * 50);
-            const hasData = item.total_mentions > 0;
-            
-            return `
-            <tr class="${getSentimentRowClass(standardizedScore)}">
-                <td class="fw-bold">${item.ticker}</td>
-                <td class="text-center">${item.total_mentions || 0}</td>
-                <td class="text-center">${hasData ? (item.sentiment_percentages?.positive || 0) + '%' : '<span class="text-muted">-</span>'}</td>
-                <td class="text-center">${hasData ? (item.sentiment_percentages?.neutral || 0) + '%' : '<span class="text-muted">-</span>'}</td>
-                <td class="text-center">${hasData ? (item.sentiment_percentages?.negative || 0) + '%' : '<span class="text-muted">-</span>'}</td>
-                <td class="text-center">
-                    <span class="badge ${getSentimentBadgeClass(standardizedScore)}">
-                        ${standardizedScore.toFixed(1)}
-                    </span>
-                </td>
-                <td class="text-center">
-                    <span class="badge ${getTrendBadgeClass(item.trend_direction)}">
-                        ${getTrendIcon(item.trend_direction)} ${item.trend_direction || 'stable'}
-                    </span>
-                </td>
-            </tr>`;
-        }).join('');
-    }
-    
-    // Show sentiment section
-    sentimentSection.style.display = 'block';
-}
+
 
 // Format sentiment data for AI evaluation table
 function formatSentiment(sentimentData) {
