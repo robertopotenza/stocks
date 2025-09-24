@@ -460,19 +460,6 @@ async function addTicker() {
 
 
 // Utility functions
-function formatPrice(price) {
-    if (price === null || price === undefined || price === 'N/A' || price === '') {
-        return 'N/A';
-    }
-    
-    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-    if (isNaN(numPrice)) {
-        return 'N/A';
-    }
-    
-    return '$' + numPrice.toFixed(2);
-}
-
 function formatMarketCap(marketCap) {
     if (marketCap === null || marketCap === undefined || marketCap === 'N/A' || marketCap === '') {
         return 'N/A';
@@ -492,19 +479,6 @@ function formatMarketCap(marketCap) {
     } else {
         return '$' + numCap.toLocaleString();
     }
-}
-
-function formatPERatio(peRatio) {
-    if (peRatio === null || peRatio === undefined || peRatio === 'N/A' || peRatio === '') {
-        return 'N/A';
-    }
-    
-    const numPE = typeof peRatio === 'string' ? parseFloat(peRatio) : peRatio;
-    if (isNaN(numPE)) {
-        return 'N/A';
-    }
-    
-    return numPE.toFixed(2);
 }
 
 function showSuccess(message) {
@@ -722,9 +696,6 @@ function displayAIEvaluation(data) {
                         ${stock.recommendation}
                     </span>
                 </td>
-                <td class="text-price">${formatPrice(stock.price)}</td>
-                <td>${formatPERatio(stock.pe_ratio)}</td>
-                <td>${formatRiskReward(stock.risk_reward_ratio)}</td>
                 <td>${formatSentiment(stock.sentiment_data)}</td>
                 <td class="small">${stock.commentary}</td>
             </tr>
@@ -733,7 +704,7 @@ function displayAIEvaluation(data) {
         // Show rankings container
         if (rankingsContainer) rankingsContainer.style.display = 'block';
     } else if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No stocks to display</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No stocks to display</td></tr>';
         if (rankingsContainer) rankingsContainer.style.display = 'block';
     }
 
@@ -780,19 +751,6 @@ function getScoreProgressClass(score) {
     if (score >= 45) return 'bg-warning';
     if (score >= 30) return 'bg-secondary';
     return 'bg-danger';
-}
-
-function formatRiskReward(riskReward) {
-    if (riskReward === null || riskReward === undefined || riskReward === 'N/A' || riskReward === '') {
-        return 'N/A';
-    }
-    
-    const numRR = typeof riskReward === 'string' ? parseFloat(riskReward) : riskReward;
-    if (isNaN(numRR)) {
-        return 'N/A';
-    }
-    
-    return numRR.toFixed(2);
 }
 
 // Sentiment Analysis Functions
@@ -1185,7 +1143,7 @@ async function downloadExcel() {
         
         // Set filename with timestamp
         const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-        a.download = `ai_stock_evaluation_matrix_${timestamp}.xlsx`;
+        a.download = `ai_stock_evaluation_${timestamp}.xlsx`;
         
         // Trigger download
         document.body.appendChild(a);
