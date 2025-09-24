@@ -120,3 +120,16 @@ test_*.py
 # OS files
 .DS_Store
 Thumbs.db
+
+# Project-specific
+# Backup files created by extractor
+tickers_backup_*.xlsx
+*_backup_*.xlsx
+
+# Temporary debug files
+debug_limited_*.xlsx
+temp_*.xlsx
+
+# Logs directory
+logs/
+*.log

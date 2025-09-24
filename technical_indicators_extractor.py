@@ -101,6 +101,12 @@ class TechnicalIndicatorsExtractor:
             
         try:
             headers = self._get_headers()
+            
+            # Enhanced error reporting for production debugging
+            logger.debug(f"Attempting to fetch {url}")
+            logger.debug(f"Request headers: {headers}")
+            logger.debug(f"Timeout: {self.timeout}s")
+            
             response = requests.get(url, headers=headers, timeout=self.timeout)
             response.raise_for_status()
             
@@ -108,10 +114,33 @@ class TechnicalIndicatorsExtractor:
             self.page_cache[url] = soup
             
             logger.debug(f"Successfully fetched {url} with requests")
+            logger.debug(f"Response status: {response.status_code}, Content length: {len(response.text)}")
             return soup
             
+        except requests.exceptions.ConnectionError as e:
+            # Enhanced DNS/connection error reporting
+            if "Failed to resolve" in str(e) or "Name or service not known" in str(e):
+                logger.error(f"DNS Resolution Failed for {url}: {e}")
+                logger.error("Possible causes: DNS server misconfiguration, network restrictions, or firewall blocking")
+                logger.error("Suggested fixes:")
+                logger.error("  1. Add to /etc/hosts: echo '5.254.205.57 www.investing.com investing.com' >> /etc/hosts")
+                logger.error("  2. Configure DNS: export DNS_SERVER=8.8.8.8")
+                logger.error("  3. Check proxy settings: export HTTPS_PROXY=http://proxy:port")
+            else:
+                logger.error(f"Connection error for {url}: {e}")
+            return None
+        except requests.exceptions.Timeout as e:
+            logger.warning(f"Timeout fetching {url} after {self.timeout}s: {e}")
+            return None
+        except requests.exceptions.HTTPError as e:
+            logger.warning(f"HTTP error for {url}: {e}")
+            if e.response.status_code == 403:
+                logger.warning("Access forbidden - possibly blocked by rate limiting or user agent")
+            elif e.response.status_code == 404:
+                logger.warning("Page not found - URL may be incorrect")
+            return None
         except Exception as e:
-            logger.warning(f"Failed to fetch {url} with requests: {e}")
+            logger.warning(f"Unexpected error fetching {url}: {type(e).__name__}: {e}")
             return None
     
     def _extract_with_selenium(self, url: str) -> Optional[BeautifulSoup]:
@@ -497,9 +526,15 @@ class TechnicalIndicatorsExtractor:
             else:
                 # Network failure - use mock data for testing
                 logger.warning(f"Network unavailable for {ticker}, using mock data for testing")
+                logger.warning("This indicates a production issue that needs immediate attention:")
+                logger.warning("  1. DNS resolution failure for investing.com")
+                logger.warning("  2. Network connectivity problems")
+                logger.warning("  3. Firewall or proxy configuration issues")
+                logger.warning("Run 'python production_debug.py' for detailed diagnosis")
+                
                 indicators = self._generate_mock_indicators(ticker)
                 result['data_quality'] = 'mock'
-                result['notes'] = 'Mock data used due to network unavailability'
+                result['notes'] = 'Mock data - PRODUCTION ISSUE: Network/DNS failure. Run production_debug.py for fixes.'
         
         # Merge indicators into result
         result.update(indicators)
