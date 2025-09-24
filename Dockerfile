@@ -70,7 +70,6 @@ RUN echo "nameserver 8.8.8.8" >> /etc/resolv.conf && \
     echo "nameserver 1.1.1.1" >> /etc/resolv.conf
 
 # Add investing.com to hosts file for reliability  
-RUN echo "5.254.205.57 www.investing.com investing.com" >> /etc/hosts
 
 # Create a non-root user for security
 RUN useradd --create-home --shell /bin/bash app
