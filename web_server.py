@@ -19,6 +19,7 @@ from stock_prices import main as run_stock_fetcher, fetch_stock_data, load_ticke
 from ai_evaluation import evaluate_stock_portfolio, evaluate_stock_portfolio_with_sentiment
 from sentiment_analysis import analyze_portfolio_sentiment
 from combined_analysis import analyze_combined_portfolio
+from technical_indicators_extractor import TechnicalIndicatorsExtractor
 from logging_config import setup_logging, get_web_logs, clear_web_logs, get_logger
 
 # Setup logging with web capture enabled
@@ -600,6 +601,94 @@ def get_combined_analysis():
     except Exception as e:
         logger.error(f"Error in combined analysis: {e}")
         return jsonify({'error': f'Failed to perform combined analysis: {str(e)}'}), 500
+
+
+@app.route('/extract-technical-indicators')
+def extract_technical_indicators():
+    """Extract technical indicators for all tickers using web scraping."""
+    logger.debug("Technical indicators extraction endpoint accessed")
+    
+    try:
+        # Check if URL.xlsx exists
+        url_file = 'URL.xlsx'
+        if not os.path.exists(url_file):
+            return jsonify({
+                'error': 'URL.xlsx file not found. This file is required for technical indicators extraction.'
+            }), 404
+        
+        # Get parameters
+        headless = request.args.get('headless', 'true').lower() == 'true'
+        timeout = min(int(request.args.get('timeout', '30')), 60)  # Max 60 seconds
+        limit = request.args.get('limit', type=int)
+        
+        logger.info(f"Starting technical indicators extraction (headless={headless}, timeout={timeout})")
+        
+        # Load URL mappings
+        url_df = pd.read_excel(url_file)
+        if limit and limit > 0:
+            url_df = url_df.head(limit)
+            logger.info(f"Limited to first {limit} tickers")
+            
+            # Create a temporary limited file
+            limited_file = f"temp_limited_URL_{limit}.xlsx"
+            url_df.to_excel(limited_file, index=False)
+            url_file = limited_file
+        
+        # Initialize extractor
+        extractor = TechnicalIndicatorsExtractor(
+            headless=headless,
+            timeout=timeout,
+            delay_min=1.0,
+            delay_max=2.0
+        )
+        
+        # Process in a separate thread to avoid blocking
+        def run_extraction():
+            try:
+                extractor.process_tickers_file(url_file, TICKERS_FILE)
+            finally:
+                extractor.cleanup()
+                # Clean up temporary file
+                if limit and limit > 0:
+                    try:
+                        import os
+                        os.remove(limited_file)
+                    except:
+                        pass
+        
+        # For now, run synchronously with a smaller subset for testing
+        if limit and limit <= 5:
+            # Small test - run synchronously
+            success = extractor.process_tickers_file(url_file, TICKERS_FILE)
+            extractor.cleanup()
+            
+            if success:
+                return jsonify({
+                    'status': 'completed',
+                    'message': f'Successfully extracted technical indicators for {len(url_df)} tickers',
+                    'processed_count': len(url_df)
+                })
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Technical indicators extraction failed'
+                }), 500
+        else:
+            # Larger batch - run asynchronously
+            thread = threading.Thread(target=run_extraction)
+            thread.daemon = True
+            thread.start()
+            
+            return jsonify({
+                'status': 'started',
+                'message': f'Technical indicators extraction started for {len(url_df)} tickers',
+                'note': 'Check /status for progress updates'
+            })
+        
+    except Exception as e:
+        logger.error(f"Error in technical indicators extraction: {e}")
+        return jsonify({'error': f'Failed to extract technical indicators: {str(e)}'}), 500
+
 
 if __name__ == '__main__':
     # Get port from environment (Railway, Heroku, etc.)
