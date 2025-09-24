@@ -4,30 +4,35 @@ A Python script that fetches comprehensive stock data from Robinhood for a list 
 
 ## Features
 
-- Fetches comprehensive stock data using the Robinhood API including:
-  - Current stock price
-  - 52-week high and low
-  - Market capitalization 
-  - P/E ratio
-  - **Technical Analysis Levels (NEW!):**
-    - **Pivot Point Support & Resistance**: Calculated using daily high, low, close prices
-    - **Recent Support & Resistance**: Based on recent price action analysis over 20-day lookback period
-- **🔥 Social Media Sentiment Analysis (NEW!):**
+# Stock Data Fetcher with AI Analysis
+
+A Python application that provides AI-powered stock evaluation and sentiment analysis through a modern web dashboard. The system has been streamlined to focus on essential AI analysis and sentiment data.
+
+## Features
+
+- **🤖 AI-Powered Stock Evaluation:**
+  - **Multi-factor Analysis**: Comprehensive scoring using neutral baselines
+  - **Intelligent Scoring**: Weighted scoring system with plain English explanations
+  - **Stock Rankings**: Automatically ranks stocks from most to least attractive
+  - **Investment Recommendations**: Buy/Hold/Avoid recommendations with detailed reasoning
+
+- **🔥 Social Media Sentiment Analysis:**
   - **Reddit Integration**: Analyzes posts from investing subreddits (/r/investing, /r/stocks, etc.)
   - **Twitter/X Integration**: Fetches and analyzes recent tweets about stock tickers
   - **Advanced Sentiment Scoring**: Uses TextBlob and VADER sentiment analysis
   - **Portfolio-wide Metrics**: Overall sentiment scores, most positive/negative stocks
   - **Trend Analysis**: 5-day sentiment trend direction (improving/declining/stable)
   - **Visual Dashboard**: Comprehensive sentiment display with color-coded metrics
-- **🤖 AI-Powered Stock Evaluation:**
-  - **Multi-factor Analysis**: Technical position, valuation, risk/reward, momentum, and sentiment
-  - **Intelligent Scoring**: Weighted scoring system with plain English explanations
-  - **Stock Rankings**: Automatically ranks stocks from most to least attractive
-  - **Investment Recommendations**: Buy/Hold/Avoid recommendations with detailed reasoning
-- Reads ticker symbols from Excel file
-- Writes results back to Excel file with new columns
-- Supports Multi-Factor Authentication (MFA)
-- Configurable credentials via environment variables or script modification
+
+- **📊 Minimal Data Output:**
+  - **Streamlined Excel Export**: Only essential data (Date, Ticker) to reduce complexity
+  - **Backup Protection**: Automatic backup of existing Excel files before overwriting
+  - **Focus on AI Insights**: Emphasizes AI analysis and sentiment over raw market data
+
+- **🌐 Modern Web Interface:**
+  - **Responsive Dashboard**: Clean, modern web interface for all analysis
+  - **Real-time Updates**: Live status updates and progress tracking
+  - **One-click Analysis**: Simple buttons to trigger AI evaluation and sentiment analysis
 - Error handling for invalid tickers or API issues with 'N/A' fallback values
 - Uses openpyxl engine for Excel operations
 - Clean, formatted console output and Excel results
@@ -89,27 +94,11 @@ To create your own:
 
 You can also start by copying `sample_tickers.xlsx` to `tickers.xlsx` and modify it as needed.
 
-After running the script, the Excel file will be updated with additional columns:
-- **Price**: Current stock price
-- **52w_High**: 52-week high price
-- **52w_Low**: 52-week low price  
-- **MarketCap**: Market capitalization
-- **PE_Ratio**: Price-to-earnings ratio
-- **Pivot_Support_1**: Primary pivot-based support level
-- **Pivot_Support_2**: Secondary pivot-based support level
-- **Pivot_Resistance_1**: Primary pivot-based resistance level
-- **Pivot_Resistance_2**: Secondary pivot-based resistance level
-- **Recent_Support**: Recent support level based on 20-day price action
-- **Recent_Resistance**: Recent resistance level based on 20-day price action
-- **Risk_Reward_Ratio**: Risk/reward ratio based on support/resistance levels
-- **Distance_from_52w_High_Pct**: Percentage distance from 52-week high
-- **Distance_from_52w_Low_Pct**: Percentage distance from 52-week low
-- **Upside_Potential_Pct**: Upside potential percentage based on pivot resistance
-- **Downside_Risk_Pct**: Downside risk percentage based on pivot support
-- **PEG_Ratio**: Price/Earnings to Growth ratio (currently N/A - requires growth data)
-- **Valuation_Flag**: Valuation assessment (Undervalued/Fair Value/Overvalued)
-- **Entry_Opportunity_Flag**: Entry opportunity assessment (Favorable/Neutral/Unfavorable)
-- **Price_Level_Flag**: Price level assessment (Near Top/Mid Range/Near Bottom)
+After running the script, the Excel file will be updated with minimal essential columns:
+- **Date**: Date of data collection
+- **Ticker**: Stock ticker symbol
+
+The focus is now on AI analysis and sentiment insights rather than raw market data. Full analysis results are displayed in the web dashboard interface.
 
 ## Usage
 
@@ -222,38 +211,29 @@ MFA Code (press Enter if no MFA):
 ✓ Logged out of Robinhood
 ```
 
-The Excel file (`tickers.xlsx`) will be updated with new columns containing the fetched data:
+The Excel file (`tickers.xlsx`) will be updated with minimal essential data:
 
-| Ticker | Price  | 52w_High | 52w_Low | MarketCap      | PE_Ratio | Risk_Reward_Ratio | Distance_from_52w_High_Pct | Valuation_Flag | Entry_Opportunity_Flag |
-|--------|--------|----------|---------|----------------|----------|-------------------|----------------------------|----------------|------------------------|
-| AAPL   | 150.25 | 199.62   | 124.17  | 2400000000000  | 28.5     | 2.00              | 24.7                       | Fair Value     | Neutral                |
-| GOOGL  | 2750.80| 3030.93  | 2193.62 | 1800000000000  | 25.2     | 1.98              | 9.2                        | Fair Value     | Neutral                |
-| ...    | ...    | ...      | ...     | ...            | ...      | ...               | ...                        | ...            | ...                    |
+| Date       | Ticker |
+|------------|--------|
+| 2025-09-24 | AAPL   |
+| 2025-09-24 | GOOGL  |
+| 2025-09-24 | MSFT   |
+| ...        | ...    |
 
-*Note: This table shows a subset of columns. The full Excel output includes all technical analysis columns (support/resistance levels), financial metrics (upside/downside potential), and assessment flags.*
+*The Excel file now contains only essential tracking information. All analysis results (AI scores, recommendations, sentiment) are displayed in the web dashboard interface.*
 
-## Technical Analysis
 
-The script now includes comprehensive technical analysis to identify support and resistance levels:
+## Web Dashboard
 
-### Pivot Point Analysis
-- **Pivot Point**: Calculated as (High + Low + Close) / 3 using the most recent trading day
-- **Support Levels**: 
-  - Support 1 = (2 × Pivot Point) - High
-  - Support 2 = Pivot Point - (High - Low)
-- **Resistance Levels**:
-  - Resistance 1 = (2 × Pivot Point) - Low  
-  - Resistance 2 = Pivot Point + (High - Low)
+The application features a modern web dashboard that provides:
 
-### Recent Price Action Analysis
-- Analyzes the last 20 trading days of price data
-- Identifies key support and resistance levels based on recent highs and lows
-- Provides additional confirmation for trading decisions
+- **AI Stock Evaluation**: Comprehensive scoring and ranking with plain English explanations
+- **Sentiment Analysis**: Social media sentiment tracking from Reddit and Twitter/X
+- **Combined Analysis**: Integrated AI and sentiment scoring for optimal stock rankings
+- **Real-time Updates**: Live progress tracking and status updates
+- **Excel Export**: Download analysis results with automatic backup protection
 
-### Data Requirements
-- Uses 3 months of daily historical data for calculations
-- Handles missing or insufficient data gracefully with 'N/A' values
-- All calculations are performed using Robinhood's historical price data
+Access the dashboard by visiting `http://localhost:5000` when running locally, or your deployment URL.
 
 ## Railway Deployment
 
