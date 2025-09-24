@@ -326,7 +326,7 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
     total_tickers = len(tickers)
     
     logger.info(f"🔄 Starting data fetch for {total_tickers} tickers...")
-    logger.info("📊 Progress will be reported every 5 tickers")
+    logger.debug("📊 Progress will be reported every 5 tickers")
     
     for i, ticker in enumerate(tickers, 1):
         stock_data = {
@@ -490,13 +490,13 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
             calculate_ai_evaluation_flags(stock_data)
             
             results[ticker] = stock_data
-            logger.info(f"{i}/{total_tickers} {ticker}: ${stock_data['Price']} | "
-                       f"Sup: {stock_data['Pivot_Support_1']} | Res: {stock_data['Pivot_Resistance_1']}")
+            logger.debug(f"{i}/{total_tickers} {ticker}: ${stock_data['Price']} | "
+                        f"Sup: {stock_data['Pivot_Support_1']} | Res: {stock_data['Pivot_Resistance_1']}")
             
             # Progress reporting every 5 tickers or at significant milestones
             if i % 5 == 0 or i == total_tickers:
                 percentage = (i / total_tickers) * 100
-                logger.info(f"📈 Progress Update: {i}/{total_tickers} tickers processed ({percentage:.1f}% complete)")
+                logger.debug(f"📈 Progress Update: {i}/{total_tickers} tickers processed ({percentage:.1f}% complete)")
             
         except Exception as e:
             error_msg = f"Error: {e}"
@@ -646,17 +646,17 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
             price_level = row['Price_Level_Flag']
             
             if isinstance(price, (int, float)):
-                logger.info(f"{ticker:>8}: ${safe_format_price(price)} | "
-                           f"52w: ${safe_format_number(high_52w, '>8.2f')}-${safe_format_number(low_52w, '>8.2f')} | "
-                           f"Cap: {safe_format_number(market_cap, '>12.0f')} | "
-                           f"P/E: {safe_format_number(pe_ratio, '>6.2f')}")
-                logger.info(f"{'':>8}  Pivot S/R: {safe_format_number(pivot_sup1, '.2f')}-{safe_format_number(pivot_res1, '.2f')} | "
-                           f"Recent S/R: {safe_format_number(recent_sup, '.2f')}-{safe_format_number(recent_res, '.2f')} | "
-                           f"R/R: {safe_format_number(risk_reward, '.2f')}")
-                logger.info(f"{'':>8}  52w Dist: H{safe_format_number(dist_high, '.1f')}% L{safe_format_number(dist_low, '.1f')}% | "
-                           f"Val: {valuation} | Entry: {entry_opp} | Level: {price_level}")
+                logger.debug(f"{ticker:>8}: ${safe_format_price(price)} | "
+                            f"52w: ${safe_format_number(high_52w, '>8.2f')}-${safe_format_number(low_52w, '>8.2f')} | "
+                            f"Cap: {safe_format_number(market_cap, '>12.0f')} | "
+                            f"P/E: {safe_format_number(pe_ratio, '>6.2f')}")
+                logger.debug(f"{'':>8}  Pivot S/R: {safe_format_number(pivot_sup1, '.2f')}-{safe_format_number(pivot_res1, '.2f')} | "
+                            f"Recent S/R: {safe_format_number(recent_sup, '.2f')}-{safe_format_number(recent_res, '.2f')} | "
+                            f"R/R: {safe_format_number(risk_reward, '.2f')}")
+                logger.debug(f"{'':>8}  52w Dist: H{safe_format_number(dist_high, '.1f')}% L{safe_format_number(dist_low, '.1f')}% | "
+                            f"Val: {valuation} | Entry: {entry_opp} | Level: {price_level}")
             else:
-                logger.info(f"{ticker:>8}: {str(price):>12} | Data: N/A")
+                logger.debug(f"{ticker:>8}: {str(price):>12} | Data: N/A")
         
         logger.info("=" * 70)
         
@@ -664,10 +664,10 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
         logger.error(f"❌ Error writing results to Excel: {e}")
         # Fall back to logging results
         logger.info("📊 FALLBACK: Displaying stock data in logs (Excel write failed)")
-        logger.info("=" * 50)
+        logger.debug("=" * 50)
         for ticker, data in results.items():
-            logger.info(f"{ticker}: {data}")
-        logger.info("=" * 50)
+            logger.debug(f"{ticker}: {data}")
+        logger.debug("=" * 50)
 
 
 def main():
