@@ -779,43 +779,6 @@ class TechnicalIndicatorsExtractor:
             'ADX_14': round(20 + (hash_val % 50), 1),  # ADX between 20-70
             'ATR_14': round(1 + (hash_val % 10), 2)  # ATR between 1-11
         }
-        """
-        Extract Woodie's Pivot Points from page structure.
-        
-        Args:
-            soup: BeautifulSoup object
-            indicators: Dictionary to update with pivot points
-        """
-        try:
-            # Look for pivot points table or structure
-            pivot_tables = soup.find_all('table', class_=re.compile(r'pivot|technical', re.I))
-            
-            for table in pivot_tables:
-                rows = table.find_all('tr')
-                for row in rows:
-                    cells = row.find_all(['td', 'th'])
-                    if len(cells) >= 2:
-                        label = cells[0].get_text().strip().lower()
-                        value_text = cells[1].get_text().strip()
-                        
-                        try:
-                            value = float(value_text.replace(',', ''))
-                            
-                            if 'pivot' in label or 'pp' in label:
-                                indicators['Woodies_Pivot'] = value
-                            elif 's1' in label or 'support 1' in label:
-                                indicators['Woodies_S1'] = value
-                            elif 's2' in label or 'support 2' in label:
-                                indicators['Woodies_S2'] = value
-                            elif 'r1' in label or 'resistance 1' in label:
-                                indicators['Woodies_R1'] = value
-                            elif 'r2' in label or 'resistance 2' in label:
-                                indicators['Woodies_R2'] = value
-                        except ValueError:
-                            continue
-                            
-        except Exception as e:
-            logger.debug(f"Failed to extract pivot points from table structure: {e}")
     
     def _extract_pivot_points(self, soup: BeautifulSoup, indicators: Dict[str, Any]):
         """
