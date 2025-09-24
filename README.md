@@ -59,6 +59,10 @@ export ROBINHOOD_USERNAME=your_email@example.com
 export ROBINHOOD_PASSWORD=your_password
 export ROBINHOOD_MFA=123456  # Optional: For non-interactive MFA (useful for deployment)
 
+# Investing.com credentials (Optional - for enhanced data access when using Selenium)
+export investing_login=your_investing_email@example.com
+export investing_password=your_investing_password
+
 # Social Media Sentiment Analysis (Optional - will use fallback if not provided)
 export REDDIT_CLIENT_ID=your_reddit_client_id
 export REDDIT_CLIENT_SECRET=your_reddit_client_secret
@@ -66,9 +70,14 @@ export REDDIT_USER_AGENT=YourApp/1.0
 export TWITTER_BEARER_TOKEN=your_twitter_bearer_token
 ```
 
-**Note**: For Multi-Factor Authentication (MFA), you can either:
-- Set `ROBINHOOD_MFA` environment variable for non-interactive mode (useful for headless deployments)
-- Leave it unset to be prompted interactively for the MFA code (only in interactive environments)
+**Note**: 
+- For Multi-Factor Authentication (MFA), you can either:
+  - Set `ROBINHOOD_MFA` environment variable for non-interactive mode (useful for headless deployments)
+  - Leave it unset to be prompted interactively for the MFA code (only in interactive environments)
+- For Investing.com login:
+  - These credentials are **optional** and only used when Selenium is required for data extraction
+  - If not provided, the application will work normally without logging into Investing.com
+  - Login is attempted automatically when accessing Investing.com URLs via Selenium
 - In headless environments (Docker, Railway, CI), the application will automatically skip MFA prompts and proceed without MFA if the environment variable is not set
 
 ### Method 2: Configuration File
@@ -273,9 +282,13 @@ Set these environment variables in your Railway project:
 - `ROBINHOOD_USERNAME`: Your Robinhood email/username
 - `ROBINHOOD_PASSWORD`: Your Robinhood password  
 - `ROBINHOOD_MFA`: (Optional) Your MFA code for non-interactive login
+- `investing_login`: (Optional) Your Investing.com email/username for enhanced data access
+- `investing_password`: (Optional) Your Investing.com password for enhanced data access
 - `TICKERS_FILE`: Set to `tickers.xlsx` if keeping the Excel file in the repository
 - `WEB_MODE`: Set to `false` for worker mode, or `true` (default) for web service mode
 - `PORT`: (Auto-set by Railway) Port for the web service
+
+**Note**: The Investing.com credentials are optional and only used when Selenium is required for technical indicators extraction. If not provided, the application will function normally without logging into Investing.com.
 
 ### Database Storage (Optional)
 

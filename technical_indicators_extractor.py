@@ -69,6 +69,17 @@ class TechnicalIndicatorsExtractor:
         self.page_cache = {}
         self.current_header_profile = 0
         
+        # Investing.com login credentials from environment variables
+        self.investing_login = os.environ.get('investing_login')
+        self.investing_password = os.environ.get('investing_password')
+        self.investing_logged_in = False
+        
+        # Log credential availability (without exposing actual values)
+        if self.investing_login and self.investing_password:
+            logger.info("🔐 Investing.com credentials detected - login will be attempted when using Selenium")
+        else:
+            logger.debug("No Investing.com credentials found - will proceed without login")
+        
         # Set up requests session with retry strategy
         self.session = self._setup_requests_session()
         
@@ -295,6 +306,102 @@ class TechnicalIndicatorsExtractor:
             logger.error(f"Failed to setup Selenium driver: {e}")
             return None
     
+    def _login_to_investing_com(self) -> bool:
+        """
+        Attempt to log into investing.com using Selenium driver.
+        
+        Returns:
+            bool: True if login successful or no credentials provided, False if login failed
+        """
+        # Skip login if no credentials or already logged in
+        if not (self.investing_login and self.investing_login.strip() and self.investing_password and self.investing_password.strip()):
+            logger.debug("No Investing.com credentials provided - skipping login")
+            return True
+        
+        if self.investing_logged_in:
+            logger.debug("Already logged into Investing.com")
+            return True
+            
+        if not self.driver:
+            logger.warning("No Selenium driver available for Investing.com login")
+            return False
+            
+        try:
+            logger.info("🔐 Attempting to log into Investing.com...")
+            
+            # Navigate to login page
+            login_url = "https://www.investing.com/members-admin/auth/signIn/"
+            self.driver.get(login_url)
+            
+            # Wait for login form to be present
+            WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.ID, "loginFormUser_email"))
+            )
+            
+            # Find and fill login form
+            email_field = self.driver.find_element(By.ID, "loginFormUser_email")
+            password_field = self.driver.find_element(By.ID, "loginFormUser_password")
+            
+            # Clear fields and enter credentials
+            email_field.clear()
+            email_field.send_keys(self.investing_login)
+            
+            password_field.clear()
+            password_field.send_keys(self.investing_password)
+            
+            # Find and click login button
+            login_button = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']")
+            login_button.click()
+            
+            # Wait for login to complete - check for successful redirect or user menu
+            try:
+                # Wait for either success indicators or error messages
+                WebDriverWait(self.driver, 15).until(
+                    lambda driver: (
+                        # Success indicators
+                        driver.find_elements(By.CSS_SELECTOR, ".userMenu, .user-menu, [data-test='user-menu']") or
+                        driver.current_url != login_url or
+                        # Error indicators
+                        driver.find_elements(By.CSS_SELECTOR, ".error, .alert-danger, .errorMessage")
+                    )
+                )
+                
+                # Check for error messages
+                error_elements = self.driver.find_elements(By.CSS_SELECTOR, ".error, .alert-danger, .errorMessage")
+                if error_elements:
+                    error_text = error_elements[0].text.strip()
+                    logger.error(f"❌ Investing.com login failed: {error_text}")
+                    return False
+                
+                # Check for successful login indicators
+                success_indicators = self.driver.find_elements(By.CSS_SELECTOR, ".userMenu, .user-menu, [data-test='user-menu'], .user_name")
+                if success_indicators or self.driver.current_url != login_url:
+                    logger.info("✅ Successfully logged into Investing.com")
+                    self.investing_logged_in = True
+                    return True
+                else:
+                    logger.warning("⚠️ Investing.com login status unclear - proceeding anyway")
+                    return True
+                    
+            except TimeoutException:
+                logger.warning("⏱️ Investing.com login timeout - may have succeeded, proceeding anyway")
+                return True
+                
+        except NoSuchElementException as e:
+            logger.warning(f"⚠️ Investing.com login form elements not found: {e}")
+            logger.warning("Login page structure may have changed - proceeding without login")
+            return True
+            
+        except TimeoutException as e:
+            logger.warning(f"⏱️ Investing.com login page timeout: {e}")
+            logger.warning("Network or page loading issues - proceeding without login")
+            return True
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Unexpected error during Investing.com login: {e}")
+            logger.warning("Proceeding without login - extraction may still work")
+            return True
+    
     def _random_delay(self, retry_count: int = 0):
         """Add random delay between requests with exponential backoff on retries."""
         base_delay = random.uniform(self.delay_min, self.delay_max)
@@ -434,6 +541,11 @@ class TechnicalIndicatorsExtractor:
             
         try:
             logger.info(f"🤖 Attempting to fetch {url} using Selenium WebDriver")
+            
+            # Attempt login to investing.com if credentials are provided and URL is from investing.com
+            if "investing.com" in url.lower() and not self.investing_logged_in:
+                self._login_to_investing_com()
+                
             self.driver.get(url)
             
             # Wait for page to load with shorter timeout
@@ -928,6 +1040,7 @@ class TechnicalIndicatorsExtractor:
                 pass
             self.driver = None
         self.page_cache.clear()
+        self.investing_logged_in = False
 
 
 def main():

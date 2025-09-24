@@ -40,14 +40,23 @@ RUN wget -qO- https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor 
     && apt-get install -y google-chrome-stable \
     && rm -rf /var/lib/apt/lists/*
 
-# Install ChromeDriver
-RUN CHROME_VERSION=$(google-chrome --version | cut -d ' ' -f3 | cut -d '.' -f1) \
-    && CHROMEDRIVER_VERSION=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION}") \
-    && wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" \
+# Install ChromeDriver using the new Chrome for Testing endpoints
+RUN CHROME_VERSION=$(google-chrome --version | cut -d ' ' -f3 | cut -d '.' -f1-3) \
+    && echo "Chrome version: ${CHROME_VERSION}" \
+    && CHROMEDRIVER_URL="https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json" \
+    && CHROMEDRIVER_VERSION=$(curl -s "${CHROMEDRIVER_URL}" | grep -o "\"version\":\"${CHROME_VERSION}[^\"]*" | head -1 | cut -d '"' -f4) \
+    && if [ -z "${CHROMEDRIVER_VERSION}" ]; then \
+        echo "No exact match found, using latest stable ChromeDriver" \
+        && CHROMEDRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE") \
+        && echo "Using ChromeDriver version: ${CHROMEDRIVER_VERSION}"; \
+       else \
+        echo "Using matched ChromeDriver version: ${CHROMEDRIVER_VERSION}"; \
+       fi \
+    && wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip" \
     && unzip /tmp/chromedriver.zip -d /tmp/ \
-    && mv /tmp/chromedriver /usr/local/bin/chromedriver \
+    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
     && chmod +x /usr/local/bin/chromedriver \
-    && rm /tmp/chromedriver.zip
+    && rm -rf /tmp/chromedriver.zip /tmp/chromedriver-linux64
 
 # Upgrade pip and setup certificates
 RUN pip install --upgrade pip
