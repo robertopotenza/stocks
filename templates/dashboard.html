@@ -218,6 +218,119 @@
             </div>
         </div>
 
+        <!-- Technical Indicators Section -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-chart-area me-2"></i>Technical Indicators Analysis
+                        </h5>
+                        <div>
+                            <button class="btn btn-sm btn-outline-success me-2" onclick="runTechnicalIndicators()">
+                                <i class="fas fa-line-chart"></i> Extract Indicators
+                            </button>
+                            <button class="btn btn-sm btn-outline-primary" onclick="loadTechnicalIndicators()">
+                                <i class="fas fa-sync-alt"></i> Refresh Data
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="technical-indicators-loading" class="text-center py-4" style="display: none;">
+                            <div class="spinner-border text-success" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <div class="mt-2">Extracting technical indicators...</div>
+                        </div>
+                        
+                        <!-- Technical Indicators Summary -->
+                        <div id="technical-indicators-summary" style="display: none;">
+                            <div class="row mb-4">
+                                <div class="col-md-2">
+                                    <div class="card bg-info text-white">
+                                        <div class="card-body text-center">
+                                            <h3 id="tech-total-with-data">0</h3>
+                                            <small>With Indicators</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="card bg-success text-white">
+                                        <div class="card-body text-center">
+                                            <h3 id="tech-good-quality">0</h3>
+                                            <small>Good Quality</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="card bg-warning text-dark">
+                                        <div class="card-body text-center">
+                                            <h3 id="tech-partial-quality">0</h3>
+                                            <small>Partial Quality</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="card bg-secondary text-white">
+                                        <div class="card-body text-center">
+                                            <h3 id="tech-mock-quality">0</h3>
+                                            <small>Mock Data</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="card bg-danger text-white">
+                                        <div class="card-body text-center">
+                                            <h3 id="tech-fallback-quality">0</h3>
+                                            <small>Fallback</small>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-2">
+                                    <div class="card bg-dark text-white">
+                                        <div class="card-body text-center">
+                                            <h3 id="tech-coverage-percent">0%</h3>
+                                            <small>Coverage</small>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Technical Indicators Table -->
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th>Ticker</th>
+                                            <th>Pivot</th>
+                                            <th>S1/R1</th>
+                                            <th>EMA20</th>
+                                            <th>SMA50</th>
+                                            <th>RSI(14)</th>
+                                            <th>MACD</th>
+                                            <th>Bollinger</th>
+                                            <th>Volume</th>
+                                            <th>ADX/ATR</th>
+                                            <th>Quality</th>
+                                            <th>Last Updated</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="technical-indicators-tbody">
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        
+                        <div id="technical-indicators-placeholder" class="text-center text-muted py-4">
+                            <i class="fas fa-chart-area fa-3x mb-3"></i>
+                            <p>Click "Extract Indicators" to fetch technical analysis data for your tickers, or "Refresh Data" to view existing data.</p>
+                            <p class="small">Technical indicators include Woodie's Pivot Points, Moving Averages (EMA20, SMA50), RSI, MACD, Bollinger Bands, Volume, ADX, and ATR.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Social Media Sentiment Section -->
         <div class="row mt-4">
             <div class="col-12">
