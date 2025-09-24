@@ -4,6 +4,24 @@ Debug helper script for technical indicators extractor.
 
 This script provides an easy way to test and debug the technical indicators
 extractor with immediate output and detailed logging.
+
+Usage examples:
+  python debug_extractor.py                    # Quick test with 3 tickers
+  python debug_extractor.py --limit 1         # Test with just 1 ticker  
+  python debug_extractor.py --check-files     # Just validate file structure
+  python debug_extractor.py --no-headless     # Run with visible browser (if available)
+
+Expected log messages when working:
+  - "Loading URL mappings from ..."
+  - "Processing X/Y: TICKER"
+  - "Extracted indicators for TICKER with quality: ..."
+  - "Successfully saved N ticker results to ..."
+
+Common issues and solutions:
+  - Network issues: Extractor will use mock data (quality: 'mock')
+  - Selenium disabled: Will fallback to requests-only mode
+  - File permission errors: Check write permissions on output file
+  - Missing columns: Ensure URL.xlsx has 'Ticker' and 'URL' columns
 """
 
 import os

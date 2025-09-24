@@ -120,3 +120,12 @@ test_*.py
 # OS files
 .DS_Store
 Thumbs.db
+
+# Backup files
+*_backup_*.xlsx
+
+# Temporary files
+temp_*.xlsx
+*_limited_*.xlsx
+debug_limited_*.xlsx
+limited_URL*.xlsx
