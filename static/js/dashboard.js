@@ -66,6 +66,7 @@ function updateStatusDisplay(status) {
     const runCount = document.getElementById('run-count');
     const lastError = document.getElementById('last-error');
     const startButton = document.getElementById('start-job-btn');
+    const runAllButton = document.getElementById('run-all-btn');
     const lastUpdate = document.getElementById('last-update');
     
     // Update status badge and job status
@@ -105,10 +106,20 @@ function updateStatusDisplay(status) {
         startButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Running...';
         startButton.disabled = true;
         startButton.className = 'btn btn-warning w-100';
+        
+        // Also disable Run All button when job is running (unless it's already running the full flow)
+        if (runAllButton && !runAllButton.disabled) {
+            runAllButton.disabled = true;
+        }
     } else {
         startButton.innerHTML = '<i class="fas fa-play me-2"></i>Start Data Fetch';
         startButton.disabled = false;
         startButton.className = 'btn btn-primary w-100';
+        
+        // Re-enable Run All button when job is not running (unless it's still in its own flow)
+        if (runAllButton && runAllButton.innerHTML.includes('Run All')) {
+            runAllButton.disabled = false;
+        }
     }
     
     // If job status changed, restart polling with appropriate frequency
@@ -145,6 +156,104 @@ async function startJob() {
     } catch (error) {
         console.error('Error starting job:', error);
         showError('Failed to start job: ' + error.message);
+    }
+}
+
+// Run complete analysis flow: start job -> poll until complete -> run routine analysis
+async function runAllAnalysis() {
+    const runAllButton = document.getElementById('run-all-btn');
+    const startButton = document.getElementById('start-job-btn');
+    
+    try {
+        // Disable both buttons and show loading state
+        runAllButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Running All...';
+        runAllButton.disabled = true;
+        runAllButton.className = 'btn btn-warning w-100';
+        startButton.disabled = true;
+        
+        showSuccess('Starting complete analysis flow...');
+        
+        // Step 1: Start the data fetch job
+        showSuccess('Step 1/3: Starting data fetch job...');
+        const runResponse = await fetch('/run');
+        if (!runResponse.ok) {
+            throw new Error(`Failed to start job: HTTP ${runResponse.status}`);
+        }
+        
+        const runData = await runResponse.json();
+        if (runData.error) {
+            throw new Error(runData.error);
+        }
+        
+        showSuccess('Data fetch job started. Monitoring progress...');
+        
+        // Step 2: Poll until job completion
+        showSuccess('Step 2/3: Waiting for data fetch to complete...');
+        let attempts = 0;
+        const maxAttempts = 120; // 10 minutes max (5s intervals)
+        
+        while (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+            attempts++;
+            
+            const statusResponse = await fetch('/status');
+            if (!statusResponse.ok) {
+                throw new Error(`Failed to check status: HTTP ${statusResponse.status}`);
+            }
+            
+            const statusData = await statusResponse.json();
+            
+            // Update UI with current status
+            updateStatusDisplay(statusData);
+            loadLogs(); // Refresh logs to show progress
+            
+            if (statusData.status === 'completed') {
+                showSuccess('Data fetch completed successfully!');
+                break;
+            } else if (statusData.status === 'error') {
+                throw new Error(`Data fetch failed: ${statusData.last_error || 'Unknown error'}`);
+            } else if (statusData.status === 'running') {
+                // Update progress message
+                showSuccess(`Data fetch in progress... (${attempts * 5}s elapsed)`);
+            }
+        }
+        
+        if (attempts >= maxAttempts) {
+            throw new Error('Data fetch timed out after 10 minutes');
+        }
+        
+        // Step 3: Run routine analysis
+        showSuccess('Step 3/3: Running comprehensive analysis...');
+        
+        // Use the existing runRoutineAnalysis logic but inline to handle errors properly
+        const analysisResponse = await fetch('/combined-analysis');
+        if (!analysisResponse.ok) {
+            throw new Error(`Analysis failed: HTTP ${analysisResponse.status}`);
+        }
+        
+        const analysisData = await analysisResponse.json();
+        if (analysisData.error) {
+            throw new Error(analysisData.error);
+        }
+        
+        // Display the routine analysis results
+        displayRoutineAnalysis(analysisData);
+        
+        showSuccess('🎉 Complete analysis flow finished successfully!');
+        
+    } catch (error) {
+        console.error('Error in run all analysis:', error);
+        showError('Run All failed: ' + error.message);
+        
+    } finally {
+        // Re-enable buttons and restore normal state
+        runAllButton.innerHTML = '<i class="fas fa-bolt me-2"></i>Run All';
+        runAllButton.disabled = false;
+        runAllButton.className = 'btn btn-success w-100';
+        startButton.disabled = false;
+        
+        // Refresh status one final time
+        setTimeout(refreshStatus, 1000);
     }
 }
 
