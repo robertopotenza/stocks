@@ -1,0 +1,75 @@
+version: '3.8'
+
+services:
+  stocks-app:
+    build: 
+      context: .
+      dockerfile: Dockerfile.fixed
+    container_name: stocks-extractor
+    
+    # Network configuration for DNS resolution
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    
+    # Environment variables for network and debugging
+    environment:
+      - LOG_LEVEL=DEBUG
+      - DNS_SERVER=8.8.8.8
+      - PYTHONHTTPSVERIFY=0
+      # Uncomment and configure if using a proxy
+      # - HTTP_PROXY=http://proxy.company.com:8080
+      # - HTTPS_PROXY=http://proxy.company.com:8080
+      # - NO_PROXY=localhost,127.0.0.1,github.com
+    
+    # Add hosts entries for reliability
+    extra_hosts:
+      - "www.investing.com:5.254.205.57"
+      - "investing.com:5.254.205.57"
+    
+    # Volume mounts for data persistence
+    volumes:
+      - ./tickers.xlsx:/app/tickers.xlsx
+      - ./URL.xlsx:/app/URL.xlsx
+      - ./logs:/app/logs
+    
+    # Port mapping (if using web interface)
+    ports:
+      - "5000:5000"
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+# Optional: separate service for debugging
+  stocks-debug:
+    build: 
+      context: .
+      dockerfile: Dockerfile.fixed
+    container_name: stocks-debug
+    command: ["python", "production_debug.py", "--full-test"]
+    
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    
+    environment:
+      - LOG_LEVEL=DEBUG
+      - DNS_SERVER=8.8.8.8
+    
+    extra_hosts:
+      - "www.investing.com:5.254.205.57"
+      - "investing.com:5.254.205.57"
+    
+    profiles:
+      - debug  # Only run when explicitly requested with --profile debug
+
+volumes:
+  logs:
