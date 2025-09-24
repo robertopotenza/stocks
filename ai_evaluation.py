@@ -22,13 +22,13 @@ class StockEvaluator:
     def __init__(self):
         """Initialize the stock evaluator with scoring weights."""
         # Scoring weights for different factors (sum should be 1.0)
+        # Note: sentiment removed from total score calculation per requirements
         self.weights = {
-            'technical_position': 0.25,    # Position relative to support/resistance
-            'valuation': 0.20,             # PE ratio and valuation flags
-            'risk_reward': 0.20,           # Risk/reward ratio
-            'momentum': 0.15,              # Distance from 52w high/low
-            'upside_potential': 0.10,      # Upside vs downside potential
-            'sentiment': 0.10              # Social media sentiment
+            'technical_position': 0.28,    # Position relative to support/resistance (increased from 0.25)
+            'valuation': 0.22,             # PE ratio and valuation flags (increased from 0.20)
+            'risk_reward': 0.22,           # Risk/reward ratio (increased from 0.20)
+            'momentum': 0.17,              # Distance from 52w high/low (increased from 0.15)
+            'upside_potential': 0.11       # Upside vs downside potential (increased from 0.10)
         }
     
     def evaluate_stocks(self, stock_data: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -81,14 +81,13 @@ class StockEvaluator:
         upside_score = self._score_upside_potential(data)
         sentiment_score = self._score_sentiment(data)
         
-        # Calculate weighted total score
+        # Calculate weighted total score (excluding sentiment per requirements)
         total_score = (
             technical_score * self.weights['technical_position'] +
             valuation_score * self.weights['valuation'] +
             risk_reward_score * self.weights['risk_reward'] +
             momentum_score * self.weights['momentum'] +
-            upside_score * self.weights['upside_potential'] +
-            sentiment_score * self.weights['sentiment']
+            upside_score * self.weights['upside_potential']
         )
         
         # Generate AI commentary
