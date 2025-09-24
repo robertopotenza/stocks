@@ -166,7 +166,8 @@ class CombinedStockAnalyzer:
         
         # Fallback to old calculation if standardized score not available
         if sentiment_score is None:
-            # Convert sentiment score (-1 to +1) to 0-100 scale for consistency
+            # Convert sentiment score (-1 to +1) to 0-100 scale using net positivity approach
+            # Since we don't have percentages, use the compound score conversion
             sentiment_score = max(0, min(100, (sentiment_score_raw + 1) * 50))
         
         # Calculate combined score using new formula:
