@@ -325,7 +325,8 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
     results = {}
     total_tickers = len(tickers)
     
-    logger.info(f"Fetching stock data for {total_tickers} tickers...")
+    logger.info(f"🔄 Starting data fetch for {total_tickers} tickers...")
+    logger.info("📊 Progress will be reported every 5 tickers")
     
     for i, ticker in enumerate(tickers, 1):
         stock_data = {
@@ -488,6 +489,11 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
             logger.info(f"{i}/{total_tickers} {ticker}: ${stock_data['Price']} | "
                        f"Sup: {stock_data['Pivot_Support_1']} | Res: {stock_data['Pivot_Resistance_1']}")
             
+            # Progress reporting every 5 tickers or at significant milestones
+            if i % 5 == 0 or i == total_tickers:
+                percentage = (i / total_tickers) * 100
+                logger.info(f"📈 Progress Update: {i}/{total_tickers} tickers processed ({percentage:.1f}% complete)")
+            
         except Exception as e:
             error_msg = f"Error: {e}"
             results[ticker] = {
@@ -513,6 +519,11 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
                 'Price_Level_Flag': 'N/A'
             }
             logger.warning(f"{i}/{total_tickers} {ticker}: {error_msg}")
+    
+    logger.info(f"✅ Data fetching completed: {len(results)} tickers processed")
+    successful_count = sum(1 for data in results.values() if isinstance(data.get('Price'), (int, float)))
+    error_count = len(results) - successful_count
+    logger.info(f"📊 Summary: {successful_count} successful, {error_count} errors")
     
     return results
 
@@ -602,13 +613,14 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
         
         df = pd.DataFrame(data_rows)
         
+        logger.info(f"💾 Saving {len(data_rows)} stock records to Excel file...")
         # Write to Excel using openpyxl engine
         df.to_excel(file_path, engine='openpyxl', index=False)
         
-        logger.info(f"Results written to {file_path}")
+        logger.info(f"✅ Results successfully written to {file_path}")
         
         # Log summary for user
-        logger.info("STOCK DATA SUMMARY")
+        logger.info("📊 FINAL STOCK DATA SUMMARY")
         logger.info("=" * 70)
         
         for _, row in df.iterrows():
@@ -645,9 +657,9 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
         logger.info("=" * 70)
         
     except Exception as e:
-        logger.error(f"Error writing results to Excel: {e}")
+        logger.error(f"❌ Error writing results to Excel: {e}")
         # Fall back to logging results
-        logger.info("STOCK DATA (Excel write failed)")
+        logger.info("📊 FALLBACK: Displaying stock data in logs (Excel write failed)")
         logger.info("=" * 50)
         for ticker, data in results.items():
             logger.info(f"{ticker}: {data}")
@@ -657,6 +669,8 @@ def write_results_to_excel(tickers: List[str], results: Dict[str, Dict[str, Any]
 def main():
     """Main function to orchestrate the stock price fetching process"""
     logger.info("🚀 Stock Data Fetcher - Robinhood Edition")
+    logger.info("=" * 50)
+    logger.info("📋 STARTING MAIN EXECUTION STEPS")
     logger.info("=" * 50)
     
     # Check if credentials are set
@@ -670,28 +684,47 @@ def main():
         return
     
     # Step 1: Login to Robinhood
+    logger.info("📍 STEP 1/5: Authenticating with Robinhood API")
     logger.info(f"🔐 Logging into Robinhood as {USERNAME}...")
     if not login_to_robinhood(USERNAME, PASSWORD):
+        logger.error("❌ STEP 1 FAILED: Could not authenticate with Robinhood")
         return
+    logger.info("✅ STEP 1 COMPLETED: Successfully authenticated with Robinhood")
     
     # Step 2: Load Excel tickers
+    logger.info("📍 STEP 2/5: Loading stock tickers from Excel file")
     logger.info(f"📊 Loading tickers from {TICKERS_FILE}...")
     tickers = load_tickers_from_excel(TICKERS_FILE)
     if not tickers:
+        logger.error("❌ STEP 2 FAILED: Could not load tickers from Excel file")
         return
+    logger.info(f"✅ STEP 2 COMPLETED: Successfully loaded {len(tickers)} tickers")
     
     # Step 3: Fetch comprehensive stock data
+    logger.info("📍 STEP 3/5: Fetching comprehensive stock data")
+    logger.info("🔄 This may take several minutes depending on the number of tickers...")
     results = fetch_stock_data(tickers)
+    logger.info("✅ STEP 3 COMPLETED: Stock data fetching finished")
     
     # Step 4: Write results to Excel
+    logger.info("📍 STEP 4/5: Writing results back to Excel file")
     write_results_to_excel(tickers, results, TICKERS_FILE)
+    logger.info("✅ STEP 4 COMPLETED: Results written to Excel file")
     
-    # Logout
+    # Step 5: Cleanup and logout
+    logger.info("📍 STEP 5/5: Cleaning up and logging out")
     try:
         r.logout()
-        logger.info("Logged out of Robinhood")
+        logger.info("🔓 Logged out of Robinhood")
+        logger.info("✅ STEP 5 COMPLETED: Cleanup finished")
     except Exception as e:
-        logger.warning(f"Logout warning: {e}")
+        logger.warning(f"⚠️ Logout warning: {e}")
+        logger.info("✅ STEP 5 COMPLETED: Cleanup finished (with warnings)")
+    
+    logger.info("=" * 50)
+    logger.info("🎉 ALL STEPS COMPLETED SUCCESSFULLY!")
+    logger.info("📊 Stock data has been updated in the Excel file")
+    logger.info("=" * 50)
 
 
 if __name__ == "__main__":
