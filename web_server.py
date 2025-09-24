@@ -261,8 +261,18 @@ def get_stock_data():
         # Read Excel file
         df = pd.read_excel(TICKERS_FILE)
         
+        # Replace NaN values with None for JSON serialization
+        # Handle both NaN and inf values properly
+        df = df.replace([pd.NA, pd.NaT, float('nan'), float('inf'), float('-inf')], None)
+        
         # Convert to list of dictionaries
         stocks = df.to_dict(orient='records')
+        
+        # Final pass to ensure no NaN values remain
+        for stock in stocks:
+            for key, value in stock.items():
+                if pd.isna(value):
+                    stock[key] = None
         
         return jsonify({
             'stocks': stocks,

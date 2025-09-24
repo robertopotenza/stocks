@@ -1160,3 +1160,257 @@ async function downloadExcel() {
         showError('Download failed: ' + error.message);
     }
 }
+
+// Technical Indicators Functions
+
+// Run technical indicators extraction
+async function runTechnicalIndicators() {
+    const loadingElement = document.getElementById('technical-indicators-loading');
+    const summarySection = document.getElementById('technical-indicators-summary');
+    const placeholderSection = document.getElementById('technical-indicators-placeholder');
+    
+    try {
+        // Show loading state
+        if (loadingElement) loadingElement.style.display = 'block';
+        if (summarySection) summarySection.style.display = 'none';
+        if (placeholderSection) placeholderSection.style.display = 'none';
+        
+        showSuccess('Starting technical indicators extraction...');
+        
+        // Get current ticker limit and include as query parameter
+        const limit = getTickerLimit();
+        const response = await fetch(`/extract-technical-indicators?limit=${encodeURIComponent(limit)}&headless=true&timeout=30`);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        showSuccess(`Technical indicators extraction completed! Processed ${data.processed_count || 0} tickers.`);
+        
+        // Load and display the updated data
+        setTimeout(() => {
+            loadTechnicalIndicators();
+        }, 1000);
+        
+    } catch (error) {
+        console.error('Error running technical indicators:', error);
+        showError('Technical indicators extraction failed: ' + error.message);
+        
+        // Show placeholder again
+        if (loadingElement) loadingElement.style.display = 'none';
+        if (placeholderSection) placeholderSection.style.display = 'block';
+    }
+}
+
+// Load and display technical indicators data
+async function loadTechnicalIndicators() {
+    const loadingElement = document.getElementById('technical-indicators-loading');
+    const summarySection = document.getElementById('technical-indicators-summary');
+    const placeholderSection = document.getElementById('technical-indicators-placeholder');
+    
+    try {
+        // Show loading state
+        if (loadingElement) loadingElement.style.display = 'block';
+        if (summarySection) summarySection.style.display = 'none';
+        if (placeholderSection) placeholderSection.style.display = 'none';
+        
+        // Fetch stock data
+        const response = await fetch('/data');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Process technical indicators data
+        displayTechnicalIndicators(data.stocks || []);
+        
+    } catch (error) {
+        console.error('Error loading technical indicators:', error);
+        showError('Failed to load technical indicators: ' + error.message);
+        
+        // Show placeholder
+        if (loadingElement) loadingElement.style.display = 'none';
+        if (placeholderSection) placeholderSection.style.display = 'block';
+    }
+}
+
+// Display technical indicators data
+function displayTechnicalIndicators(stocks) {
+    const loadingElement = document.getElementById('technical-indicators-loading');
+    const summarySection = document.getElementById('technical-indicators-summary');
+    const placeholderSection = document.getElementById('technical-indicators-placeholder');
+    
+    // Hide loading
+    if (loadingElement) loadingElement.style.display = 'none';
+    
+    // Filter stocks that have technical indicators data
+    const technicalCols = ['Woodies_Pivot', 'RSI_14', 'EMA20', 'SMA50', 'MACD_value', 'Volume_daily'];
+    const stocksWithTech = stocks.filter(stock => {
+        return technicalCols.some(col => stock[col] != null && stock[col] !== 'N/A' && stock[col] !== '');
+    });
+    
+    if (stocksWithTech.length === 0) {
+        // Show placeholder if no data
+        if (placeholderSection) placeholderSection.style.display = 'block';
+        return;
+    }
+    
+    // Update summary statistics
+    updateTechnicalSummary(stocks, stocksWithTech);
+    
+    // Update table
+    updateTechnicalTable(stocksWithTech);
+    
+    // Show summary section
+    if (summarySection) summarySection.style.display = 'block';
+}
+
+// Update technical indicators summary stats
+function updateTechnicalSummary(allStocks, stocksWithTech) {
+    const totalWithData = stocksWithTech.length;
+    const coverage = allStocks.length > 0 ? (totalWithData / allStocks.length * 100) : 0;
+    
+    // Count by quality
+    const qualityCounts = {
+        good: 0,
+        partial: 0,
+        mock: 0,
+        fallback: 0
+    };
+    
+    stocksWithTech.forEach(stock => {
+        const quality = stock.data_quality || 'unknown';
+        if (qualityCounts.hasOwnProperty(quality)) {
+            qualityCounts[quality]++;
+        }
+    });
+    
+    // Update summary cards
+    const totalElement = document.getElementById('tech-total-with-data');
+    const goodElement = document.getElementById('tech-good-quality');
+    const partialElement = document.getElementById('tech-partial-quality');
+    const mockElement = document.getElementById('tech-mock-quality');
+    const fallbackElement = document.getElementById('tech-fallback-quality');
+    const coverageElement = document.getElementById('tech-coverage-percent');
+    
+    if (totalElement) totalElement.textContent = totalWithData;
+    if (goodElement) goodElement.textContent = qualityCounts.good;
+    if (partialElement) partialElement.textContent = qualityCounts.partial;
+    if (mockElement) mockElement.textContent = qualityCounts.mock;
+    if (fallbackElement) fallbackElement.textContent = qualityCounts.fallback;
+    if (coverageElement) coverageElement.textContent = coverage.toFixed(1) + '%';
+}
+
+// Update technical indicators table
+function updateTechnicalTable(stocksWithTech) {
+    const tbody = document.getElementById('technical-indicators-tbody');
+    if (!tbody) return;
+    
+    // Sort by ticker name
+    const sortedStocks = stocksWithTech.sort((a, b) => (a.Ticker || '').localeCompare(b.Ticker || ''));
+    
+    tbody.innerHTML = sortedStocks.map(stock => {
+        // Format data values
+        const pivot = formatTechValue(stock.Woodies_Pivot);
+        const s1r1 = `${formatTechValue(stock.Woodies_S1)} / ${formatTechValue(stock.Woodies_R1)}`;
+        const ema20 = formatTechValue(stock.EMA20);
+        const sma50 = formatTechValue(stock.SMA50);
+        const rsi = formatTechValue(stock.RSI_14, 1);
+        const macd = `${formatTechValue(stock.MACD_value, 3)} / ${formatTechValue(stock.MACD_signal, 3)}`;
+        const bollinger = `${formatTechValue(stock.Bollinger_upper)} / ${formatTechValue(stock.Bollinger_lower)}`;
+        const volume = formatVolume(stock.Volume_daily);
+        const adxAtr = `${formatTechValue(stock.ADX_14, 1)} / ${formatTechValue(stock.ATR_14, 2)}`;
+        const quality = stock.data_quality || 'unknown';
+        const lastUpdated = formatDate(stock.indicator_last_checked);
+        
+        const qualityBadge = getTechnicalQualityBadge(quality);
+        
+        return `
+            <tr>
+                <td><strong>${stock.Ticker || 'N/A'}</strong></td>
+                <td>${pivot}</td>
+                <td class="small">${s1r1}</td>
+                <td>${ema20}</td>
+                <td>${sma50}</td>
+                <td>${rsi}</td>
+                <td class="small">${macd}</td>
+                <td class="small">${bollinger}</td>
+                <td class="small">${volume}</td>
+                <td class="small">${adxAtr}</td>
+                <td>${qualityBadge}</td>
+                <td class="small text-muted">${lastUpdated}</td>
+            </tr>
+        `;
+    }).join('');
+}
+
+// Helper function to format technical values
+function formatTechValue(value, decimals = 2) {
+    if (value == null || value === 'N/A' || value === '') {
+        return '<span class="text-muted">-</span>';
+    }
+    
+    const num = parseFloat(value);
+    if (isNaN(num)) {
+        return '<span class="text-muted">-</span>';
+    }
+    
+    return num.toFixed(decimals);
+}
+
+// Helper function to format volume
+function formatVolume(volume) {
+    if (volume == null || volume === 'N/A' || volume === '') {
+        return '<span class="text-muted">-</span>';
+    }
+    
+    const num = parseFloat(volume);
+    if (isNaN(num)) {
+        return '<span class="text-muted">-</span>';
+    }
+    
+    if (num >= 1e9) {
+        return (num / 1e9).toFixed(1) + 'B';
+    } else if (num >= 1e6) {
+        return (num / 1e6).toFixed(1) + 'M';
+    } else if (num >= 1e3) {
+        return (num / 1e3).toFixed(0) + 'K';
+    }
+    
+    return num.toFixed(0);
+}
+
+// Helper function to format date
+function formatDate(dateString) {
+    if (!dateString) return 'Never';
+    
+    try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    } catch (error) {
+        return 'Invalid';
+    }
+}
+
+// Helper function to get quality badge
+function getTechnicalQualityBadge(quality) {
+    const badges = {
+        good: '<span class="badge bg-success">Good</span>',
+        partial: '<span class="badge bg-warning text-dark">Partial</span>',
+        mock: '<span class="badge bg-secondary">Mock</span>',
+        fallback: '<span class="badge bg-danger">Fallback</span>'
+    };
+    
+    return badges[quality] || '<span class="badge bg-light text-dark">Unknown</span>';
+}
