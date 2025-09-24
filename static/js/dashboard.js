@@ -1058,9 +1058,6 @@ function displayRoutineAnalysis(data) {
                 <td>${index + 1}</td>
                 <td><strong>${stock.ticker}</strong></td>
                 <td>${stock.price || 'N/A'}</td>
-                <td class="text-center">${(stock.ai_evaluation?.score || 0).toFixed(1)}</td>
-                <td class="text-center">${(stock.sentiment_analysis?.score || 0).toFixed(1)}</td>
-                <td class="text-center">${(stock.risk_reward?.score || 0).toFixed(1)}</td>
                 <td>
                     <div class="progress" style="height: 20px;">
                         <div class="progress-bar ${getRoutineScoreProgressClass(stock.combined_score)}" 
@@ -1073,6 +1070,7 @@ function displayRoutineAnalysis(data) {
                         </div>
                     </div>
                 </td>
+                <td class="text-center">${(stock.sentiment_analysis?.score || 0).toFixed(1)}</td>
                 <td>
                     <span class="badge ${getRoutineRecommendationBadgeClass(stock.combined_recommendation)}">
                         ${stock.combined_recommendation}
