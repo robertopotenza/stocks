@@ -619,8 +619,9 @@ def extract_technical_indicators():
     logger.debug("Technical indicators extraction endpoint accessed")
     
     try:
-        # Check if URL.xlsx exists
-        url_file = 'URL.xlsx'
+        # Check if URL.xlsx exists - use absolute path based on script location
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        url_file = os.path.join(script_dir, 'URL.xlsx')
         if not os.path.exists(url_file):
             return jsonify({
                 'error': 'URL.xlsx file not found. This file is required for technical indicators extraction.'
