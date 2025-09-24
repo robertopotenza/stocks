@@ -83,7 +83,7 @@ class TechnicalIndicatorsExtractor:
         retry_strategy = Retry(
             total=3,
             status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["HEAD", "GET", "OPTIONS"],  # Updated parameter name
+            allowed_methods=["HEAD", "GET", "OPTIONS"],  # 'method_whitelist' was renamed to 'allowed_methods' in urllib3 v1.26.0
             backoff_factor=1,
             raise_on_status=False
         )
