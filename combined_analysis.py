@@ -22,11 +22,10 @@ class CombinedStockAnalyzer:
     def __init__(self):
         """Initialize the combined analyzer with weighting factors."""
         # Weighting for final combined score (should sum to 1.0)
-        # Combined Score = (0.50 × AI Score) + (0.30 × Sentiment Score) + (0.20 × Risk/Reward)
+        # Combined Score = (0.70 × AI Stock Evaluation Score) + (0.30 × Sentiment Score)
         self.weights = {
-            'ai_evaluation': 0.5,    # AI technical/fundamental analysis weight (excluding risk/reward)
-            'sentiment': 0.3,        # Social media sentiment weight
-            'risk_reward': 0.2       # Risk/reward ratio weight
+            'ai_evaluation': 0.7,    # AI technical/fundamental analysis weight
+            'sentiment': 0.3         # Social media sentiment weight
         }
         
         # Standardized recommendation thresholds (0-100 scale)
@@ -126,8 +125,7 @@ class CombinedStockAnalyzer:
             'methodology': {
                 'ai_weight': self.weights['ai_evaluation'],
                 'sentiment_weight': self.weights['sentiment'],
-                'risk_reward_weight': self.weights['risk_reward'],
-                'description': 'Combined score = (AI Score × 0.50) + (Sentiment Score × 0.30) + (Risk/Reward × 0.20)',
+                'description': 'Combined score = (AI Stock Evaluation Score × 0.70) + (Sentiment Score × 0.30)',
                 'recommendation_tiers': 'Strong Buy ≥70, Buy 60-69, Hold 50-59, Weak Hold 40-49, Avoid <40'
             }
         }
@@ -171,11 +169,10 @@ class CombinedStockAnalyzer:
             sentiment_score = max(0, min(100, (sentiment_score_raw + 1) * 50))
         
         # Calculate combined score using new formula:
-        # Combined Score = (0.50 × AI Score) + (0.30 × Sentiment Score) + (0.20 × Risk/Reward)
+        # Combined Score = (0.70 × AI Stock Evaluation Score) + (0.30 × Sentiment Score)
         combined_score = (
             ai_without_rr_score * self.weights['ai_evaluation'] + 
-            sentiment_score * self.weights['sentiment'] +
-            risk_reward_score * self.weights['risk_reward']
+            sentiment_score * self.weights['sentiment']
         )
         
         # Generate combined recommendation
@@ -202,10 +199,6 @@ class CombinedStockAnalyzer:
                 'total_mentions': sentiment_mentions,
                 'trend_direction': trend_direction,
                 'summary': sentiment_summary
-            },
-            'risk_reward': {
-                'score': round(risk_reward_score, 2),
-                'raw_ratio': ai_stock.get('risk_reward_ratio', 'N/A')
             },
             'price': ai_stock.get('price', 'N/A'),
             'market_cap': ai_stock.get('market_cap', 'N/A')
