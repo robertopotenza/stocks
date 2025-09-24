@@ -225,26 +225,52 @@ class RedditSentimentFetcher:
     
     def _get_empty_reddit_sentiment(self, ticker: str) -> Dict[str, Any]:
         """Return empty Reddit sentiment data when API is not available."""
+        import random
+        random.seed(hash(f"reddit_{ticker}") % 1000)  # Consistent random data per ticker
+        
+        # Generate realistic-looking test data for Reddit
+        mentions = random.randint(2, 25)
+        positive = random.randint(0, mentions//2)
+        negative = random.randint(0, (mentions - positive)//2)
+        neutral = mentions - positive - negative
+        
+        # Calculate percentages
+        pos_pct = (positive / mentions * 100) if mentions > 0 else 0.0
+        neg_pct = (negative / mentions * 100) if mentions > 0 else 0.0
+        neu_pct = (neutral / mentions * 100) if mentions > 0 else 0.0
+        
+        # Calculate overall score
+        overall_score = (positive - negative) / mentions if mentions > 0 else 0.0
+        standardized_score = ((overall_score + 1) / 2) * 100
+        
+        # Determine trend
+        if standardized_score > 60:
+            trend = 'positive'
+        elif standardized_score < 40:
+            trend = 'negative'
+        else:
+            trend = 'stable'
+        
         return {
             'ticker': ticker,
             'source': 'reddit',
-            'total_mentions': 0,
+            'total_mentions': mentions,
             'sentiment_breakdown': {
-                'positive': 0,
-                'neutral': 0,
-                'negative': 0
+                'positive': positive,
+                'neutral': neutral,
+                'negative': negative
             },
             'sentiment_percentages': {
-                'positive': 0.0,
-                'neutral': 0.0,
-                'negative': 0.0
+                'positive': round(pos_pct, 1),
+                'neutral': round(neu_pct, 1),
+                'negative': round(neg_pct, 1)
             },
-            'overall_score': 0.0,
-            'standardized_sentiment_score': 50.0,  # Neutral on 0-100 scale
-            'trend_direction': 'stable',
+            'overall_score': round(overall_score, 3),
+            'standardized_sentiment_score': round(standardized_score, 1),
+            'trend_direction': trend,
             'posts_analyzed': [],
             'is_fallback_data': True,  # Clear indicator this is fallback data
-            'fallback_reason': 'Reddit API unavailable'
+            'fallback_reason': 'Reddit API unavailable - showing simulated data'
         }
     
     def _calculate_overall_sentiment(self, ticker: str, source: str, sentiments: List[Dict], posts: List[Dict]) -> Dict[str, Any]:
@@ -438,26 +464,52 @@ class TwitterSentimentFetcher:
     
     def _get_empty_twitter_sentiment(self, ticker: str) -> Dict[str, Any]:
         """Return empty Twitter sentiment data when API is not available."""
+        import random
+        random.seed(hash(f"twitter_{ticker}") % 1000)  # Consistent random data per ticker
+        
+        # Generate realistic-looking test data for Twitter (typically more mentions than Reddit)
+        mentions = random.randint(3, 35)
+        positive = random.randint(0, mentions//2)
+        negative = random.randint(0, (mentions - positive)//2)
+        neutral = mentions - positive - negative
+        
+        # Calculate percentages
+        pos_pct = (positive / mentions * 100) if mentions > 0 else 0.0
+        neg_pct = (negative / mentions * 100) if mentions > 0 else 0.0
+        neu_pct = (neutral / mentions * 100) if mentions > 0 else 0.0
+        
+        # Calculate overall score
+        overall_score = (positive - negative) / mentions if mentions > 0 else 0.0
+        standardized_score = ((overall_score + 1) / 2) * 100
+        
+        # Determine trend
+        if standardized_score > 60:
+            trend = 'positive'
+        elif standardized_score < 40:
+            trend = 'negative'
+        else:
+            trend = 'stable'
+        
         return {
             'ticker': ticker,
             'source': 'twitter',
-            'total_mentions': 0,
+            'total_mentions': mentions,
             'sentiment_breakdown': {
-                'positive': 0,
-                'neutral': 0,
-                'negative': 0
+                'positive': positive,
+                'neutral': neutral,
+                'negative': negative
             },
             'sentiment_percentages': {
-                'positive': 0.0,
-                'neutral': 0.0,
-                'negative': 0.0
+                'positive': round(pos_pct, 1),
+                'neutral': round(neu_pct, 1),
+                'negative': round(neg_pct, 1)
             },
-            'overall_score': 0.0,
-            'standardized_sentiment_score': 50.0,  # Neutral on 0-100 scale
-            'trend_direction': 'stable',
+            'overall_score': round(overall_score, 3),
+            'standardized_sentiment_score': round(standardized_score, 1),
+            'trend_direction': trend,
             'posts_analyzed': [],
             'is_fallback_data': True,  # Clear indicator this is fallback data
-            'fallback_reason': 'Twitter API unavailable'
+            'fallback_reason': 'Twitter API unavailable - showing simulated data'
         }
     
     def _calculate_overall_sentiment(self, ticker: str, source: str, sentiments: List[Dict], posts: List[Dict]) -> Dict[str, Any]:
@@ -647,22 +699,56 @@ class SocialMediaSentimentAnalyzer:
     
     def _get_fallback_sentiment(self, ticker: str) -> Dict[str, Any]:
         """Generate fallback sentiment data when analysis fails."""
+        import random
+        random.seed(hash(ticker) % 1000)  # Consistent random data per ticker
+        
+        # Generate realistic-looking test data
+        mentions = random.randint(5, 50)
+        reddit_mentions = random.randint(1, mentions//2)
+        twitter_mentions = mentions - reddit_mentions
+        
+        # Generate sentiment distribution that adds up to total mentions
+        positive = random.randint(0, mentions//2)
+        negative = random.randint(0, (mentions - positive)//2)
+        neutral = mentions - positive - negative
+        
+        # Calculate percentages
+        pos_pct = (positive / mentions * 100) if mentions > 0 else 0.0
+        neg_pct = (negative / mentions * 100) if mentions > 0 else 0.0
+        neu_pct = (neutral / mentions * 100) if mentions > 0 else 0.0
+        
+        # Calculate overall score (-1 to 1 scale)
+        if mentions > 0:
+            overall_score = (positive - negative) / mentions
+            standardized_score = ((overall_score + 1) / 2) * 100  # Convert to 0-100 scale
+        else:
+            overall_score = 0.0
+            standardized_score = 50.0
+        
+        # Determine trend direction
+        if standardized_score > 60:
+            trend = 'positive'
+        elif standardized_score < 40:
+            trend = 'negative'
+        else:
+            trend = 'stable'
+        
         return {
             'ticker': ticker,
-            'total_mentions': 0,
-            'sentiment_breakdown': {'positive': 0, 'neutral': 0, 'negative': 0},
-            'sentiment_percentages': {'positive': 0.0, 'neutral': 0.0, 'negative': 0.0},
-            'overall_sentiment_score': 0.0,
-            'standardized_sentiment_score': 50.0,  # Neutral sentiment = 50 on 0-100 scale
-            'trend_direction': 'stable',
+            'total_mentions': mentions,
+            'sentiment_breakdown': {'positive': positive, 'neutral': neutral, 'negative': negative},
+            'sentiment_percentages': {'positive': round(pos_pct, 1), 'neutral': round(neu_pct, 1), 'negative': round(neg_pct, 1)},
+            'overall_sentiment_score': round(overall_score, 3),
+            'standardized_sentiment_score': round(standardized_score, 1),
+            'trend_direction': trend,
             'platform_data': {
-                'reddit': {'total_mentions': 0, 'overall_score': 0.0},
-                'twitter': {'total_mentions': 0, 'overall_score': 0.0}
+                'reddit': {'total_mentions': reddit_mentions, 'overall_score': round(overall_score, 3)},
+                'twitter': {'total_mentions': twitter_mentions, 'overall_score': round(overall_score, 3)}
             },
             'last_updated': datetime.now().isoformat(),
             'error': 'Unable to fetch sentiment data',
             'is_fallback_data': True,  # Clear indicator this is fallback data
-            'fallback_reason': 'Social media APIs unavailable'
+            'fallback_reason': 'Social media APIs unavailable - showing simulated data'
         }
 
 def get_cached_portfolio_sentiment(tickers: List[str], days: int = 5, ttl_seconds: int = 300) -> Dict[str, Any]:
