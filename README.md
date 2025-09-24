@@ -51,6 +51,30 @@ A Python application that provides AI-powered stock evaluation and sentiment ana
    pip install -r requirements.txt
    ```
 
+## Docker Deployment
+
+### Using Docker Compose (Recommended)
+```bash
+# Build and run with proper DNS configuration
+docker-compose up -d
+
+# For debugging
+docker-compose --profile debug up stocks-debug
+```
+
+### Manual Docker Build
+```bash
+# Build using the fixed Dockerfile (recommended)
+docker build -f Dockerfile.fixed -t stocks-extractor .
+
+# Run with proper DNS configuration
+docker run --dns=8.8.8.8 --dns=1.1.1.1 \
+           --add-host="www.investing.com:5.254.205.57" \
+           stocks-extractor
+```
+
+**Important**: Never modify `/etc/resolv.conf` or `/etc/hosts` in Dockerfile - they are read-only in modern Docker containers. Use runtime configuration instead.
+
 ## Setup
 
 ### Method 1: Environment Variables (Recommended)
