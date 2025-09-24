@@ -1,23 +1,66 @@
-# Technical Analysis Features
+# AI-Powered Stock Analysis Features
 
 ## Overview
-The enhanced Stock Data Fetcher now includes comprehensive technical analysis capabilities to extract Support and Resistance levels for each ticker. This functionality uses historical price data from the Robinhood API to calculate key technical levels that traders use for decision-making.
+The Stock Data Fetcher application has been streamlined to focus on AI-powered stock evaluation and sentiment analysis. Technical analysis features have been simplified to support the core AI functionality while maintaining a clean, minimal data structure.
 
-## New Features Added
+## Migration from Technical Analysis
 
-### 1. Pivot Point Analysis
-**Classical pivot point calculations** using the most recent trading day's data:
+### What Changed
+The application has evolved from complex technical analysis calculations to a **simplified AI-focused approach**:
 
-- **Pivot Point**: `(High + Low + Close) / 3`
-- **Support Level 1**: `(2 × Pivot Point) - High`
-- **Support Level 2**: `Pivot Point - (High - Low)`
-- **Resistance Level 1**: `(2 × Pivot Point) - Low`
-- **Resistance Level 2**: `Pivot Point + (High - Low)`
+**Previous Features (Removed):**
+- Pivot point calculations 
+- Support/resistance level calculations
+- 52-week high/low tracking
+- P/E ratio analysis
+- Risk/reward calculations
+- Price action flags
+- Volume analysis
+- Fibonacci retracements
 
-### 2. Recent Price Action Analysis
-**20-day lookback analysis** to identify:
-- Recent support levels (lowest lows in the period)
-- Recent resistance levels (highest highs in the period)
+**New Focus:**
+- **AI Neutral Scoring**: All technical components now use neutral baseline scores (50.0)
+- **Sentiment Integration**: Primary focus on social media sentiment analysis
+- **Minimal Data Output**: Excel files contain only Date and Ticker for simplicity
+- **Dashboard-Centric**: Full analysis results displayed in web interface
+
+### Benefits of the New Approach
+
+1. **Simplified Maintenance**: No complex technical calculations to maintain
+2. **Neutral Baseline**: AI scoring uses consistent neutral values, removing potential calculation errors
+3. **Focus on Insights**: Emphasis on AI interpretation rather than raw technical data
+4. **Better User Experience**: Clean dashboard interface with actionable recommendations
+
+## Current AI Analysis Components
+
+### AI Scoring System
+All scoring components return neutral values (50.0) and focus on providing:
+- **Consistent Evaluation**: All stocks evaluated on equal footing
+- **Commentary Generation**: Plain English explanations of analysis
+- **Recommendation Logic**: Clear Buy/Hold/Avoid recommendations based on composite scores
+
+### Sentiment Analysis
+The primary differentiator now comes from:
+- **Reddit Integration**: Analysis of investment community discussions
+- **Twitter/X Integration**: Social media sentiment tracking
+- **Trend Analysis**: 5-day sentiment trend direction
+- **Portfolio Metrics**: Overall sentiment scoring across all holdings
+
+## Data Schema
+
+### Excel Output (Minimal)
+```
+| Date       | Ticker |
+|------------|--------|
+| 2025-09-24 | AAPL   |
+| 2025-09-24 | GOOGL  |
+```
+
+### Dashboard Analysis (Complete)
+- AI Evaluation Scores and Rankings
+- Sentiment Analysis Results
+- Combined Analysis with Recommendations
+- Detailed Commentary for Each Stock
 - Secondary support/resistance levels for confirmation
 
 ### 3. Historical Data Integration

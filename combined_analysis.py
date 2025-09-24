@@ -199,9 +199,7 @@ class CombinedStockAnalyzer:
                 'total_mentions': sentiment_mentions,
                 'trend_direction': trend_direction,
                 'summary': sentiment_summary
-            },
-            'price': ai_stock.get('price', 'N/A'),
-            'market_cap': ai_stock.get('market_cap', 'N/A')
+            }
         }
     
     def _get_combined_recommendation(self, combined_score: float) -> str:

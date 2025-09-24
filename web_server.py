@@ -361,11 +361,10 @@ def get_ai_evaluation():
         # Read the Excel file to get stock data
         df = pd.read_excel(TICKERS_FILE)
         
-        # Check if we have the required columns for evaluation
-        required_columns = ['Ticker', 'Price', 'PE_Ratio']
-        if not all(col in df.columns for col in required_columns):
+        # Check if we have the minimal required columns
+        if 'Ticker' not in df.columns:
             return jsonify({
-                'error': 'Stock data is incomplete. Run stock fetch job to get latest data.'
+                'error': 'Stock data is incomplete. Missing ticker information.'
             }), 400
         
         # Convert DataFrame to the format expected by AI evaluation
@@ -567,11 +566,11 @@ def get_combined_analysis():
         # Get cached sentiment analysis data
         cached_sentiment = get_cached_sentiment_for_tickers(limited_tickers, ttl_minutes=5)
         
-        # Check if we have recent stock data in the Excel file
+        # Check if we have existing stock data in the Excel file
         stock_data = None
-        required_columns = ['Price', 'PE_Ratio', '52w_High', '52w_Low']
         
-        if all(col in df.columns for col in required_columns):
+        # Always try to use existing data if available (no specific column requirements)
+        if len(df.columns) > 1:  # Has more than just Ticker column
             # Convert DataFrame to stock_data format
             stock_data = {}
             for _, row in df.iterrows():
@@ -589,7 +588,7 @@ def get_combined_analysis():
             
             logger.info(f"Using existing stock data from Excel file for {len(stock_data)} tickers")
         else:
-            logger.info("No recent stock data found in Excel file, will fetch fresh data")
+            logger.info("No existing stock data found in Excel file, will fetch fresh data")
         
         # Run combined analysis with cached sentiment
         combined_result = analyze_combined_portfolio(limited_tickers, stock_data, cached_sentiment)
