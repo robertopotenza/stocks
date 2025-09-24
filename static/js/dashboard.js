@@ -1,7 +1,8 @@
-// Simple Stock Tracker Dashboard JavaScript
+// Dashboard JavaScript functionality
 
 let statusUpdateInterval;
 let isJobRunning = false;
+let currentPollInterval = 15000; // Track current polling interval
 
 // Initialize dashboard when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -9,7 +10,9 @@ document.addEventListener('DOMContentLoaded', function() {
     refreshStatus();
     loadTickerCount();
     loadLogs();
-    loadStockData();
+    
+    // Initialize ticker limit selector
+    initializeTickerLimit();
     
     // Start periodic status updates
     startStatusUpdates();
@@ -21,12 +24,16 @@ function startStatusUpdates() {
         clearInterval(statusUpdateInterval);
     }
     
+    // Intelligent polling: faster when job is running, slower when idle
+    const pollInterval = isJobRunning ? 5000 : 15000; // 5s when running, 15s when idle
+    currentPollInterval = pollInterval;
+    
     statusUpdateInterval = setInterval(function() {
         refreshStatus();
         if (isJobRunning) {
-            loadLogs();
+            loadLogs(); // Update logs when job is running
         }
-    }, 10000); // Update every 10 seconds
+    }, pollInterval);
 }
 
 // Stop periodic updates
@@ -37,139 +44,348 @@ function stopStatusUpdates() {
     }
 }
 
+// Ticker Limit Management Functions
+
+// Initialize ticker limit selector with localStorage persistence
+function initializeTickerLimit() {
+    const tickerLimitSelect = document.getElementById('ticker-limit');
+    if (!tickerLimitSelect) {
+        console.warn('Ticker limit selector not found');
+        return;
+    }
+    
+    // Load saved value from localStorage or default to "10"
+    const savedLimit = localStorage.getItem('tickerLimit') || '10';
+    tickerLimitSelect.value = savedLimit;
+    
+    // Add change event listener to save to localStorage
+    tickerLimitSelect.addEventListener('change', function() {
+        const selectedLimit = this.value;
+        localStorage.setItem('tickerLimit', selectedLimit);
+        console.log('Ticker limit changed to:', selectedLimit);
+    });
+}
+
+// Get current ticker limit value
+function getTickerLimit() {
+    const tickerLimitSelect = document.getElementById('ticker-limit');
+    return tickerLimitSelect ? tickerLimitSelect.value : '10';
+}
+
 // Refresh job status
 async function refreshStatus() {
     try {
         const response = await fetch('/status');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
-        
-        // Update status displays
-        document.getElementById('status-badge').textContent = data.status;
-        document.getElementById('job-status').textContent = data.status;
-        document.getElementById('last-run').textContent = data.last_run || 'Never';
-        document.getElementById('run-count').textContent = data.run_count || 0;
-        document.getElementById('last-error').textContent = data.last_error || 'None';
-        document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
-        
-        // Update running state
-        const wasRunning = isJobRunning;
-        isJobRunning = data.status === 'running';
-        
-        // If job finished, reload stock data
-        if (wasRunning && !isJobRunning && data.status === 'completed') {
-            loadStockData();
-        }
-        
-        // Update button states
-        const startBtn = document.getElementById('start-job-btn');
-        if (isJobRunning) {
-            startBtn.disabled = true;
-            startBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Running...';
-        } else {
-            startBtn.disabled = false;
-            startBtn.innerHTML = '<i class="fas fa-play me-2"></i>Fetch Stock Data';
-        }
+        updateStatusDisplay(data);
         
     } catch (error) {
-        console.error('Error refreshing status:', error);
+        console.error('Error fetching status:', error);
+        showError('Failed to fetch status: ' + error.message);
     }
 }
 
-// Start job
+// Update status display elements
+function updateStatusDisplay(status) {
+    const statusBadge = document.getElementById('status-badge');
+    const jobStatus = document.getElementById('job-status');
+    const lastRun = document.getElementById('last-run');
+    const runCount = document.getElementById('run-count');
+    const lastError = document.getElementById('last-error');
+    const startButton = document.getElementById('start-job-btn');
+    const runAllButton = document.getElementById('run-all-btn');
+    const lastUpdate = document.getElementById('last-update');
+    
+    // Update status badge and job status
+    const statusText = status.status || 'unknown';
+    statusBadge.textContent = statusText.charAt(0).toUpperCase() + statusText.slice(1);
+    jobStatus.textContent = statusText.charAt(0).toUpperCase() + statusText.slice(1);
+    
+    // Update status badge class
+    statusBadge.className = `badge bg-secondary me-2 status-${statusText}`;
+    
+    // Update last run
+    if (status.last_run) {
+        const lastRunDate = new Date(status.last_run);
+        lastRun.textContent = lastRunDate.toLocaleString();
+    } else {
+        lastRun.textContent = 'Never';
+    }
+    
+    // Update run count
+    runCount.textContent = status.run_count || 0;
+    
+    // Update last error
+    if (status.last_error) {
+        lastError.textContent = status.last_error;
+        lastError.className = 'fw-bold text-danger';
+    } else {
+        lastError.textContent = 'None';
+        lastError.className = 'fw-bold text-success';
+    }
+    
+    // Check if job status changed and adjust polling frequency
+    const wasRunning = isJobRunning;
+    isJobRunning = statusText === 'running';
+    
+    // Update button state
+    if (isJobRunning) {
+        startButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Running...';
+        startButton.disabled = true;
+        startButton.className = 'btn btn-warning w-100';
+        
+        // Also disable Run All button when job is running (unless it's already running the full flow)
+        if (runAllButton && !runAllButton.disabled) {
+            runAllButton.disabled = true;
+        }
+    } else {
+        startButton.innerHTML = '<i class="fas fa-play me-2"></i>Start Data Fetch';
+        startButton.disabled = false;
+        startButton.className = 'btn btn-primary w-100';
+        
+        // Re-enable Run All button when job is not running (unless it's still in its own flow)
+        if (runAllButton && runAllButton.innerHTML.includes('Run All')) {
+            runAllButton.disabled = false;
+        }
+    }
+    
+    // If job status changed, restart polling with appropriate frequency
+    if (wasRunning !== isJobRunning) {
+        console.log(`Job status changed: ${wasRunning ? 'running' : 'idle'} -> ${isJobRunning ? 'running' : 'idle'}`);
+        const newPollInterval = isJobRunning ? 5000 : 15000;
+        if (newPollInterval !== currentPollInterval) {
+            startStatusUpdates(); // Restart with new frequency
+        }
+    }
+    
+    // Update last update time
+    lastUpdate.textContent = 'Updated: ' + new Date().toLocaleTimeString();
+}
+
+// Start stock fetching job
 async function startJob() {
     try {
-        const response = await fetch('/run', { method: 'POST' });
+        const response = await fetch('/run');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
         
-        if (data.status === 'started') {
-            showSuccess('Stock data fetch started successfully!');
-            refreshStatus();
+        if (data.error) {
+            showError(data.error);
         } else {
-            showError(data.message || 'Failed to start job');
+            showSuccess('Stock fetching job started successfully!');
+            // Immediately refresh status and start checking more frequently
+            setTimeout(refreshStatus, 1000);
         }
+        
     } catch (error) {
         console.error('Error starting job:', error);
-        showError('Error starting job: ' + error.message);
+        showError('Failed to start job: ' + error.message);
     }
 }
 
-// Load ticker count
+// Run complete analysis flow: start job -> poll until complete -> run routine analysis
+async function runAllAnalysis() {
+    const runAllButton = document.getElementById('run-all-btn');
+    const startButton = document.getElementById('start-job-btn');
+    
+    try {
+        // Disable both buttons and show loading state
+        runAllButton.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Running All...';
+        runAllButton.disabled = true;
+        runAllButton.className = 'btn btn-warning w-100';
+        startButton.disabled = true;
+        
+        showSuccess('Starting complete analysis flow...');
+        
+        // Step 1: Start the data fetch job
+        showSuccess('Step 1/5: Starting data fetch job...');
+        const runResponse = await fetch('/run');
+        if (!runResponse.ok) {
+            throw new Error(`Failed to start job: HTTP ${runResponse.status}`);
+        }
+        
+        const runData = await runResponse.json();
+        if (runData.error) {
+            throw new Error(runData.error);
+        }
+        
+        showSuccess('Data fetch job started. Monitoring progress...');
+        
+        // Step 2: Poll until job completion
+        showSuccess('Step 2/5: Waiting for data fetch to complete...');
+        let attempts = 0;
+        const maxAttempts = 120; // 10 minutes max (5s intervals)
+        
+        while (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+            attempts++;
+            
+            const statusResponse = await fetch('/status');
+            if (!statusResponse.ok) {
+                throw new Error(`Failed to check status: HTTP ${statusResponse.status}`);
+            }
+            
+            const statusData = await statusResponse.json();
+            
+            // Update UI with current status
+            updateStatusDisplay(statusData);
+            loadLogs(); // Refresh logs to show progress
+            
+            if (statusData.status === 'completed') {
+                showSuccess('Data fetch completed successfully!');
+                break;
+            } else if (statusData.status === 'error') {
+                throw new Error(`Data fetch failed: ${statusData.last_error || 'Unknown error'}`);
+            } else if (statusData.status === 'running') {
+                // Update progress message
+                showSuccess(`Data fetch in progress... (${attempts * 5}s elapsed)`);
+            }
+        }
+        
+        if (attempts >= maxAttempts) {
+            throw new Error('Data fetch timed out after 10 minutes');
+        }
+        
+        // Step 3: Run routine analysis
+        showSuccess('Step 3/5: Running comprehensive analysis...');
+        
+        // Use the existing runRoutineAnalysis logic but inline to handle errors properly
+        // Get current ticker limit and include as query parameter
+        const limit = getTickerLimit();
+        const analysisResponse = await fetch(`/combined-analysis?limit=${encodeURIComponent(limit)}`);
+        if (!analysisResponse.ok) {
+            throw new Error(`Analysis failed: HTTP ${analysisResponse.status}`);
+        }
+        
+        const analysisData = await analysisResponse.json();
+        if (analysisData.error) {
+            throw new Error(analysisData.error);
+        }
+        
+        // Display the routine analysis results
+        displayRoutineAnalysis(analysisData);
+        showSuccess('Routine analysis completed successfully!');
+        
+        // Step 4: Run AI evaluation
+        showSuccess('Step 4/5: Running AI stock evaluation...');
+        
+        try {
+            const aiResponse = await fetch('/ai-evaluation');
+            if (aiResponse.ok) {
+                const aiData = await aiResponse.json();
+                if (!aiData.error) {
+                    // Display AI evaluation results
+                    displayAIEvaluation(aiData);
+                    showSuccess('AI evaluation completed successfully!');
+                } else {
+                    showError('AI evaluation returned error: ' + aiData.error);
+                }
+            } else {
+                showError('AI evaluation failed (HTTP ' + aiResponse.status + ') - continuing with other analyses...');
+            }
+        } catch (error) {
+            console.error('AI evaluation error:', error);
+            showError('AI evaluation failed: ' + error.message + ' - continuing with other analyses...');
+        }
+        
+        // Step 5: Run sentiment analysis
+        showSuccess('Step 5/5: Running social media sentiment analysis...');
+        
+        try {
+            const sentimentResponse = await fetch('/sentiment-analysis');
+            if (sentimentResponse.ok) {
+                const sentimentData = await sentimentResponse.json();
+                if (!sentimentData.error) {
+                    // Display sentiment analysis results
+                    displayStandaloneSentiment(sentimentData);
+                    showSuccess('Sentiment analysis completed successfully!');
+                } else {
+                    showError('Sentiment analysis returned error: ' + sentimentData.error);
+                }
+            } else {
+                showError('Sentiment analysis failed (HTTP ' + sentimentResponse.status + ') - continuing...');
+            }
+        } catch (error) {
+            console.error('Sentiment analysis error:', error);
+            showError('Sentiment analysis failed: ' + error.message + ' - continuing...');
+        }
+        
+        showSuccess('🎉 Complete analysis flow finished successfully!');
+        
+    } catch (error) {
+        console.error('Error in run all analysis:', error);
+        showError('Run All failed: ' + error.message);
+        
+    } finally {
+        // Re-enable buttons and restore normal state
+        runAllButton.innerHTML = '<i class="fas fa-bolt me-2"></i>Run All';
+        runAllButton.disabled = false;
+        runAllButton.className = 'btn btn-success w-100';
+        startButton.disabled = false;
+        
+        // Refresh status one final time
+        setTimeout(refreshStatus, 1000);
+    }
+}
+
+// Load ticker count for summary display
 async function loadTickerCount() {
     try {
         const response = await fetch('/data');
-        const data = await response.json();
-        
-        if (Array.isArray(data)) {
-            document.getElementById('total-tickers').textContent = data.length;
-        } else {
-            document.getElementById('total-tickers').textContent = '0';
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
+        const data = await response.json();
+        const totalTickers = document.getElementById('total-tickers');
+        
+        if (data && data.stocks) {
+            totalTickers.textContent = data.stocks.length;
+        } else {
+            totalTickers.textContent = '0';
+        }
+        
     } catch (error) {
         console.error('Error loading ticker count:', error);
-        document.getElementById('total-tickers').textContent = 'Error';
+        const totalTickers = document.getElementById('total-tickers');
+        totalTickers.textContent = '-';
     }
 }
 
-// Load stock data
-async function loadStockData() {
-    try {
-        const response = await fetch('/data');
-        const data = await response.json();
-        
-        const tbody = document.getElementById('stock-data-tbody');
-        
-        if (Array.isArray(data) && data.length > 0) {
-            tbody.innerHTML = '';
-            
-            data.forEach(stock => {
-                const row = document.createElement('tr');
-                const price = typeof stock.Price === 'number' ? `$${stock.Price.toFixed(2)}` : stock.Price;
-                
-                row.innerHTML = `
-                    <td><strong>${stock.Ticker}</strong></td>
-                    <td>${price}</td>
-                `;
-                
-                tbody.appendChild(row);
-            });
-        } else {
-            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted py-4">No stock data available</td></tr>';
-        }
-        
-    } catch (error) {
-        console.error('Error loading stock data:', error);
-        const tbody = document.getElementById('stock-data-tbody');
-        tbody.innerHTML = '<tr><td colspan="2" class="text-center text-danger py-4">Error loading data</td></tr>';
-    }
-}
+
 
 // Load logs
 async function loadLogs() {
     try {
         const response = await fetch('/logs');
-        const data = await response.json();
-        
-        const logContainer = document.getElementById('log-container');
-        if (data.logs && Array.isArray(data.logs)) {
-            logContainer.innerHTML = data.logs.join('\n');
-            logContainer.scrollTop = logContainer.scrollHeight;
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
         }
+        
+        const data = await response.json();
+        const logsContent = document.getElementById('logs-content');
+        
+        if (data.output) {
+            logsContent.textContent = data.output;
+            // Scroll to bottom
+            logsContent.scrollTop = logsContent.scrollHeight;
+        } else if (data.message) {
+            logsContent.textContent = data.message;
+        } else {
+            logsContent.textContent = 'No logs available yet...';
+        }
+        
     } catch (error) {
         console.error('Error loading logs:', error);
-    }
-}
-
-// Clear logs
-async function clearLogs() {
-    try {
-        const response = await fetch('/logs', { method: 'DELETE' });
-        if (response.ok) {
-            document.getElementById('log-container').innerHTML = '<div class="text-muted">Logs cleared</div>';
-            showSuccess('Logs cleared successfully');
-        }
-    } catch (error) {
-        console.error('Error clearing logs:', error);
-        showError('Error clearing logs');
+        const logsContent = document.getElementById('logs-content');
+        logsContent.textContent = 'Error loading logs: ' + error.message;
     }
 }
 
@@ -179,7 +395,7 @@ async function addTicker() {
     const ticker = tickerInput.value.trim().toUpperCase();
     
     if (!ticker) {
-        showError('Please enter a ticker symbol');
+        showError('Please enter a ticker symbol.');
         return;
     }
     
@@ -187,38 +403,110 @@ async function addTicker() {
         const response = await fetch('/add-ticker', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             },
             body: JSON.stringify({ ticker: ticker })
         });
         
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
         const data = await response.json();
         
-        if (response.ok) {
+        if (data.error) {
+            showError(data.error);
+        } else {
             showSuccess(`Ticker ${ticker} added successfully!`);
             tickerInput.value = '';
-            loadTickerCount();
             
-            // Close modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('addTickerModal'));
+            // Hide modal
+            const modal = document.getElementById('addTickerModal');
             if (modal) {
-                modal.hide();
+                // Try to use Bootstrap modal if available
+                if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+                    const bootstrapModal = bootstrap.Modal.getInstance(modal);
+                    if (bootstrapModal) {
+                        bootstrapModal.hide();
+                    }
+                } else {
+                    // Fallback: hide modal manually
+                    modal.style.display = 'none';
+                    modal.classList.remove('show');
+                    modal.setAttribute('aria-hidden', 'true');
+                    
+                    // Remove backdrop if exists
+                    const backdrop = document.querySelector('.modal-backdrop');
+                    if (backdrop) {
+                        backdrop.remove();
+                    }
+                    
+                    // Remove modal-open class from body
+                    document.body.classList.remove('modal-open');
+                    document.body.style.paddingRight = '';
+                }
             }
-        } else {
-            showError(data.error || 'Failed to add ticker');
+            
+            // Refresh ticker count
+            loadTickerCount();
         }
+        
     } catch (error) {
         console.error('Error adding ticker:', error);
-        showError('Error adding ticker: ' + error.message);
+        showError('Failed to add ticker: ' + error.message);
     }
 }
 
-// Download Excel file
-function downloadExcel() {
-    window.location.href = '/download-excel';
-}
+
 
 // Utility functions
+function formatPrice(price) {
+    if (price === null || price === undefined || price === 'N/A' || price === '') {
+        return 'N/A';
+    }
+    
+    const numPrice = typeof price === 'string' ? parseFloat(price) : price;
+    if (isNaN(numPrice)) {
+        return 'N/A';
+    }
+    
+    return '$' + numPrice.toFixed(2);
+}
+
+function formatMarketCap(marketCap) {
+    if (marketCap === null || marketCap === undefined || marketCap === 'N/A' || marketCap === '') {
+        return 'N/A';
+    }
+    
+    const numCap = typeof marketCap === 'string' ? parseFloat(marketCap) : marketCap;
+    if (isNaN(numCap)) {
+        return 'N/A';
+    }
+    
+    if (numCap >= 1e12) {
+        return '$' + (numCap / 1e12).toFixed(2) + 'T';
+    } else if (numCap >= 1e9) {
+        return '$' + (numCap / 1e9).toFixed(2) + 'B';
+    } else if (numCap >= 1e6) {
+        return '$' + (numCap / 1e6).toFixed(2) + 'M';
+    } else {
+        return '$' + numCap.toLocaleString();
+    }
+}
+
+function formatPERatio(peRatio) {
+    if (peRatio === null || peRatio === undefined || peRatio === 'N/A' || peRatio === '') {
+        return 'N/A';
+    }
+    
+    const numPE = typeof peRatio === 'string' ? parseFloat(peRatio) : peRatio;
+    if (isNaN(numPE)) {
+        return 'N/A';
+    }
+    
+    return numPE.toFixed(2);
+}
+
 function showSuccess(message) {
     showAlert(message, 'success');
 }
@@ -228,21 +516,25 @@ function showError(message) {
 }
 
 function showAlert(message, type) {
-    // Create alert element
-    const alert = document.createElement('div');
-    alert.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
-    alert.style.cssText = 'top: 20px; right: 20px; z-index: 9999; min-width: 300px;';
-    alert.innerHTML = `
+    // Remove existing alerts
+    const existingAlerts = document.querySelectorAll('.alert');
+    existingAlerts.forEach(alert => alert.remove());
+    
+    // Create new alert
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed`;
+    alertDiv.style.cssText = 'top: 20px; right: 20px; z-index: 9999; max-width: 400px;';
+    alertDiv.innerHTML = `
         ${message}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
     
-    document.body.appendChild(alert);
+    document.body.appendChild(alertDiv);
     
     // Auto-remove after 5 seconds
     setTimeout(() => {
-        if (alert.parentNode) {
-            alert.parentNode.removeChild(alert);
+        if (alertDiv.parentNode) {
+            alertDiv.parentNode.removeChild(alertDiv);
         }
     }, 5000);
 }
@@ -273,3 +565,640 @@ document.addEventListener('DOMContentLoaded', function() {
 window.addEventListener('beforeunload', function() {
     stopStatusUpdates();
 });
+
+// AI Evaluation Functions
+
+// Run AI evaluation using existing stock data
+async function runAIEvaluation() {
+    const loadingElement = document.getElementById('ai-evaluation-loading');
+    const placeholderElement = document.getElementById('ai-evaluation-placeholder');
+    const summarySection = document.getElementById('ai-summary-section');
+    const rankingsContainer = document.getElementById('ai-rankings-container');
+    
+    try {
+        // Show loading state
+        loadingElement.style.display = 'block';
+        placeholderElement.style.display = 'none';
+        summarySection.style.display = 'none';
+        rankingsContainer.style.display = 'none';
+        
+        showSuccess('Running AI analysis on current stock data...');
+        
+        const response = await fetch('/ai-evaluation');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Display results
+        displayAIEvaluation(data);
+        showSuccess('AI analysis completed successfully!');
+        
+    } catch (error) {
+        console.error('Error running AI evaluation:', error);
+        showError('AI evaluation failed: ' + error.message);
+        
+        // Hide loading and show placeholder
+        loadingElement.style.display = 'none';
+        placeholderElement.style.display = 'block';
+        
+    } finally {
+        loadingElement.style.display = 'none';
+    }
+}
+
+// Run quick AI evaluation with fresh data
+async function runQuickEvaluation() {
+    const loadingElement = document.getElementById('ai-evaluation-loading');
+    const placeholderElement = document.getElementById('ai-evaluation-placeholder');
+    const summarySection = document.getElementById('ai-summary-section');
+    const rankingsContainer = document.getElementById('ai-rankings-container');
+    
+    try {
+        // Show loading state
+        loadingElement.style.display = 'block';
+        placeholderElement.style.display = 'none';
+        summarySection.style.display = 'none';
+        rankingsContainer.style.display = 'none';
+        
+        showSuccess('Running quick AI evaluation with fresh data...');
+        
+        // Get current ticker limit and include as query parameter
+        const limit = getTickerLimit();
+        const response = await fetch(`/quick-evaluation?limit=${encodeURIComponent(limit)}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Display results
+        displayAIEvaluation(data);
+        showSuccess('Quick AI evaluation completed!');
+        
+    } catch (error) {
+        console.error('Error running quick evaluation:', error);
+        showError('Quick evaluation failed: ' + error.message);
+        
+        // Hide loading and show placeholder
+        loadingElement.style.display = 'none';
+        placeholderElement.style.display = 'block';
+        
+    } finally {
+        loadingElement.style.display = 'none';
+    }
+}
+
+
+
+// Display AI evaluation results
+function displayAIEvaluation(data) {
+    const summarySection = document.getElementById('ai-summary-section');
+    const rankingsContainer = document.getElementById('ai-rankings-container');
+    const placeholderElement = document.getElementById('ai-evaluation-placeholder');
+    
+    // Hide placeholder
+    if (placeholderElement) {
+        placeholderElement.style.display = 'none';
+    }
+    
+    // Update summary counts
+    const strongBuysCount = document.getElementById('strong-buys-count');
+    const buysCount = document.getElementById('buys-count');
+    const holdsCount = document.getElementById('holds-count');
+    const avoidsCount = document.getElementById('avoids-count');
+    
+    if (strongBuysCount) strongBuysCount.textContent = data.summary.strong_buys || 0;
+    if (buysCount) buysCount.textContent = data.summary.buys || 0;
+    if (holdsCount) holdsCount.textContent = data.summary.holds || 0;
+    if (avoidsCount) avoidsCount.textContent = (data.summary.avoids || 0) + (data.summary.weak_holds || 0);
+    
+    // Update top pick
+    const topPickInfo = document.getElementById('top-pick-info');
+    if (topPickInfo) {
+        if (data.summary.top_pick && data.ranked_stocks.length > 0) {
+            const topStock = data.ranked_stocks[0];
+            topPickInfo.innerHTML = `
+                <strong>${topStock.ticker}</strong> with score ${topStock.total_score}/100 
+                (${topStock.recommendation}) - ${topStock.commentary}
+            `;
+        } else {
+            topPickInfo.textContent = 'No stocks available for evaluation';
+        }
+    }
+    
+    // Show summary section
+    if (summarySection) {
+        summarySection.style.display = 'block';
+    }
+    
+    // Populate rankings table
+    const tbody = document.getElementById('ai-rankings-tbody');
+    if (tbody && data.ranked_stocks && data.ranked_stocks.length > 0) {
+        tbody.innerHTML = data.ranked_stocks.map((stock, index) => `
+            <tr class="${getRecommendationRowClass(stock.recommendation)}">
+                <td class="fw-bold">${index + 1}</td>
+                <td class="fw-bold">${stock.ticker}</td>
+                <td>
+                    <div class="d-flex align-items-center">
+                        <span class="fw-bold me-2">${stock.total_score}</span>
+                        <div class="progress flex-grow-1" style="height: 6px;">
+                            <div class="progress-bar ${getScoreProgressClass(stock.total_score)}" 
+                                 style="width: ${stock.total_score}%"></div>
+                        </div>
+                    </div>
+                </td>
+                <td>
+                    <span class="badge ${getRecommendationBadgeClass(stock.recommendation)}">
+                        ${stock.recommendation}
+                    </span>
+                </td>
+                <td class="text-price">${formatPrice(stock.price)}</td>
+                <td>${formatPERatio(stock.pe_ratio)}</td>
+                <td>${formatRiskReward(stock.risk_reward_ratio)}</td>
+                <td>${formatSentiment(stock.sentiment_data)}</td>
+                <td class="small">${stock.commentary}</td>
+            </tr>
+        `).join('');
+        
+        // Show rankings container
+        if (rankingsContainer) rankingsContainer.style.display = 'block';
+    } else if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No stocks to display</td></tr>';
+        if (rankingsContainer) rankingsContainer.style.display = 'block';
+    }
+
+}
+
+// Helper functions for AI evaluation display
+function getRecommendationRowClass(recommendation) {
+    switch (recommendation) {
+        case 'Strong Buy':
+            return 'table-success';
+        case 'Buy':
+            return 'table-info';
+        case 'Hold':
+            return 'table-warning';
+        case 'Weak Hold':
+            return 'table-secondary';
+        case 'Avoid':
+            return 'table-danger';
+        default:
+            return '';
+    }
+}
+
+function getRecommendationBadgeClass(recommendation) {
+    switch (recommendation) {
+        case 'Strong Buy':
+            return 'bg-success';
+        case 'Buy':
+            return 'bg-primary';
+        case 'Hold':
+            return 'bg-warning text-dark';
+        case 'Weak Hold':
+            return 'bg-secondary';
+        case 'Avoid':
+            return 'bg-danger';
+        default:
+            return 'bg-secondary';
+    }
+}
+
+function getScoreProgressClass(score) {
+    if (score >= 75) return 'bg-success';
+    if (score >= 60) return 'bg-primary';
+    if (score >= 45) return 'bg-warning';
+    if (score >= 30) return 'bg-secondary';
+    return 'bg-danger';
+}
+
+function formatRiskReward(riskReward) {
+    if (riskReward === null || riskReward === undefined || riskReward === 'N/A' || riskReward === '') {
+        return 'N/A';
+    }
+    
+    const numRR = typeof riskReward === 'string' ? parseFloat(riskReward) : riskReward;
+    if (isNaN(numRR)) {
+        return 'N/A';
+    }
+    
+    return numRR.toFixed(2);
+}
+
+// Sentiment Analysis Functions
+
+// Run sentiment analysis for current tickers
+async function runSentimentAnalysis() {
+    const loadingElement = document.getElementById('sentiment-analysis-loading');
+    const placeholderElement = document.getElementById('sentiment-analysis-placeholder');
+    const sentimentSection = document.getElementById('standalone-sentiment-section');
+    
+    try {
+        // Show loading state
+        loadingElement.style.display = 'block';
+        placeholderElement.style.display = 'none';
+        sentimentSection.style.display = 'none';
+        
+        showSuccess('Analyzing social media sentiment...');
+        
+        // Get current ticker limit and include as query parameter
+        const limit = getTickerLimit();
+        const response = await fetch(`/sentiment-analysis?limit=${encodeURIComponent(limit)}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Display results
+        displayStandaloneSentiment(data);
+        showSuccess('Sentiment analysis completed successfully!');
+        
+    } catch (error) {
+        console.error('Error running sentiment analysis:', error);
+        showError('Sentiment analysis failed: ' + error.message);
+        
+        // Hide loading and show placeholder
+        loadingElement.style.display = 'none';
+        placeholderElement.style.display = 'block';
+        
+    } finally {
+        loadingElement.style.display = 'none';
+    }
+}
+
+// Display standalone sentiment analysis results
+function displayStandaloneSentiment(data) {
+    const sentimentSection = document.getElementById('standalone-sentiment-section');
+    const placeholderElement = document.getElementById('sentiment-analysis-placeholder');
+    
+    // Hide placeholder
+    if (placeholderElement) {
+        placeholderElement.style.display = 'none';
+    }
+    
+    // Update summary metrics
+    const totalMentions = document.getElementById('standalone-total-mentions');
+    const mostPositive = document.getElementById('standalone-most-positive');
+    const mostNegative = document.getElementById('standalone-most-negative');
+    const avgSentiment = document.getElementById('standalone-average-sentiment');
+    
+    if (data.portfolio_summary) {
+        const summary = data.portfolio_summary;
+        if (totalMentions) totalMentions.textContent = summary.total_mentions_across_all_tickers || 0;
+        if (mostPositive) mostPositive.textContent = summary.most_positive_ticker || '-';
+        if (mostNegative) mostNegative.textContent = summary.most_negative_ticker || '-';
+        if (avgSentiment) avgSentiment.textContent = summary.average_standardized_sentiment_score || summary.average_sentiment_score || '50.0';
+    }
+    
+    // Handle data quality warning
+    const warningElement = document.getElementById('sentiment-data-warning');
+    const warningMessageElement = document.getElementById('sentiment-warning-message');
+    
+    if (data.portfolio_summary && data.portfolio_summary.has_fallback_data) {
+        if (warningElement) warningElement.style.display = 'block';
+        if (warningMessageElement) {
+            warningMessageElement.textContent = data.portfolio_summary.data_quality_warning || 'Some sentiment data may be simulated.';
+        }
+    } else {
+        if (warningElement) warningElement.style.display = 'none';
+    }
+    
+    // Populate sentiment table
+    const tbody = document.getElementById('standalone-sentiment-tbody');
+    if (tbody && data.sentiment_data) {
+        const sentimentArray = Object.entries(data.sentiment_data)
+            .map(([ticker, sentimentData]) => ({ ticker, ...sentimentData }))
+            .sort((a, b) => (b.standardized_sentiment_score || b.overall_sentiment_score || 0) - (a.standardized_sentiment_score || a.overall_sentiment_score || 0));
+        
+        tbody.innerHTML = sentimentArray.map((item, index) => {
+            const standardizedScore = item.standardized_sentiment_score || ((item.overall_sentiment_score + 1) * 50);
+            const hasData = item.total_mentions > 0;
+            const isFallback = item.is_fallback_data || false;
+            const hasPartialFallback = item.has_partial_fallback_data || false;
+            
+            // Add indicators for fallback data
+            let tickerDisplay = item.ticker;
+            let rowClass = getSentimentRowClass(standardizedScore);
+            
+            if (isFallback) {
+                tickerDisplay += ' <span class="badge bg-warning text-dark ms-1" title="Simulated data - APIs unavailable">SIM</span>';
+                rowClass += ' table-warning-subtle';
+            } else if (hasPartialFallback) {
+                tickerDisplay += ' <span class="badge bg-info text-dark ms-1" title="Partial data - some APIs unavailable">PARTIAL</span>';
+                rowClass += ' table-info-subtle';
+            }
+            
+            return `
+            <tr class="${rowClass}">
+                <td class="fw-bold">${index + 1}</td>
+                <td class="fw-bold">${tickerDisplay}</td>
+                <td class="text-center">${item.total_mentions || 0}</td>
+                <td class="text-center">${hasData ? (item.sentiment_percentages?.positive || 0) + '%' : '<span class="text-muted">-</span>'}</td>
+                <td class="text-center">${hasData ? (item.sentiment_percentages?.neutral || 0) + '%' : '<span class="text-muted">-</span>'}</td>
+                <td class="text-center">${hasData ? (item.sentiment_percentages?.negative || 0) + '%' : '<span class="text-muted">-</span>'}</td>
+                <td class="text-center">
+                    <span class="badge ${getSentimentBadgeClass(standardizedScore)}">
+                        ${standardizedScore.toFixed(1)}${isFallback ? '*' : ''}
+                    </span>
+                </td>
+                <td class="text-center">
+                    <span class="badge ${getTrendBadgeClass(item.trend_direction)}">
+                        ${getTrendIcon(item.trend_direction)} ${item.trend_direction || 'stable'}
+                    </span>
+                </td>
+            </tr>`;
+        }).join('');
+    } else if (tbody) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No sentiment data available</td></tr>';
+    }
+    
+    // Show sentiment section
+    if (sentimentSection) {
+        sentimentSection.style.display = 'block';
+    }
+}
+
+
+
+// Format sentiment data for AI evaluation table
+function formatSentiment(sentimentData) {
+    if (!sentimentData || sentimentData.total_mentions === 0) {
+        return '<small class="text-muted">No data</small>';
+    }
+    
+    const score = sentimentData.standardized_sentiment_score || ((sentimentData.overall_sentiment_score + 1) * 50) || 50;
+    const mentions = sentimentData.total_mentions || 0;
+    const badgeClass = getSentimentBadgeClass(score);
+    
+    return `
+        <div class="text-center">
+            <span class="badge ${badgeClass} mb-1">${score.toFixed(1)}</span>
+            <br>
+            <small class="text-muted">${mentions} mentions</small>
+        </div>
+    `;
+}
+
+// Helper functions for sentiment display (0-100 scale)
+function getSentimentRowClass(score) {
+    if (score > 70) return 'table-success';
+    if (score > 60) return 'table-info';
+    if (score < 30) return 'table-danger';
+    if (score < 40) return 'table-warning';
+    return '';
+}
+
+function getSentimentBadgeClass(score) {
+    if (score > 70) return 'bg-success';
+    if (score > 60) return 'bg-primary';
+    if (score < 30) return 'bg-danger';
+    if (score < 40) return 'bg-warning text-dark';
+    return 'bg-secondary';
+}
+
+function getTrendBadgeClass(trend) {
+    switch (trend) {
+        case 'improving':
+            return 'bg-success';
+        case 'declining':
+            return 'bg-danger';
+        case 'stable':
+        default:
+            return 'bg-secondary';
+    }
+}
+
+function getTrendIcon(trend) {
+    switch (trend) {
+        case 'improving':
+            return '↗';
+        case 'declining':
+            return '↘';
+        case 'stable':
+        default:
+            return '→';
+    }
+}
+
+// Routine Analysis Functions
+
+// Run comprehensive routine analysis combining AI evaluation and sentiment analysis
+async function runRoutineAnalysis() {
+    const loadingElement = document.getElementById('routine-analysis-loading');
+    const placeholderElement = document.getElementById('routine-analysis-placeholder');
+    const summarySection = document.getElementById('routine-summary-section');
+    const rankingsContainer = document.getElementById('routine-rankings-container');
+    
+    try {
+        // Show loading state
+        loadingElement.style.display = 'block';
+        placeholderElement.style.display = 'none';
+        summarySection.style.display = 'none';
+        rankingsContainer.style.display = 'none';
+        
+        showSuccess('Running comprehensive routine analysis...');
+        
+        // Get current ticker limit and include as query parameter
+        const limit = getTickerLimit();
+        const response = await fetch(`/combined-analysis?limit=${encodeURIComponent(limit)}`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+            throw new Error(data.error);
+        }
+        
+        // Display results
+        displayRoutineAnalysis(data);
+        showSuccess('Routine analysis completed successfully!');
+        
+    } catch (error) {
+        console.error('Error running routine analysis:', error);
+        showError('Routine analysis failed: ' + error.message);
+        
+        // Hide loading and show placeholder
+        loadingElement.style.display = 'none';
+        placeholderElement.style.display = 'block';
+        
+    } finally {
+        loadingElement.style.display = 'none';
+    }
+}
+
+// Display routine analysis results
+function displayRoutineAnalysis(data) {
+    const loadingElement = document.getElementById('routine-analysis-loading');
+    const placeholderElement = document.getElementById('routine-analysis-placeholder');
+    const summarySection = document.getElementById('routine-summary-section');
+    const rankingsContainer = document.getElementById('routine-rankings-container');
+    
+    // Hide loading and placeholder
+    loadingElement.style.display = 'none';
+    placeholderElement.style.display = 'none';
+    
+    // Update summary statistics
+    const buyCount = document.getElementById('routine-buy-count');
+    const holdCount = document.getElementById('routine-hold-count');
+    const avoidCount = document.getElementById('routine-avoid-count');
+    const totalCount = document.getElementById('routine-total-analyzed');
+    
+    if (buyCount) buyCount.textContent = data.summary?.buy_recommendations || 0;
+    if (holdCount) holdCount.textContent = data.summary?.hold_recommendations || 0;
+    if (avoidCount) avoidCount.textContent = data.summary?.avoid_recommendations || 0;
+    if (totalCount) totalCount.textContent = data.summary?.total_stocks_analyzed || 0;
+    
+    // Update top recommendation
+    const topRecommendation = document.getElementById('routine-top-recommendation');
+    if (topRecommendation) {
+        const topRec = data.summary?.top_recommendation;
+        if (topRec && topRec.ticker) {
+            topRecommendation.innerHTML = `
+                <strong>${topRec.ticker}</strong> with combined score ${(topRec.combined_score || 0).toFixed(1)}/100 
+                (${topRec.recommendation})
+            `;
+        } else {
+            topRecommendation.textContent = 'No stocks available for analysis';
+        }
+    }
+    
+    // Show summary section
+    if (summarySection) {
+        summarySection.style.display = 'block';
+    }
+    
+    // Populate rankings table
+    const tbody = document.getElementById('routine-rankings-tbody');
+    if (tbody && data.combined_rankings) {
+        tbody.innerHTML = '';
+        
+        data.combined_rankings.forEach((stock, index) => {
+            const row = document.createElement('tr');
+            row.className = getRoutineRecommendationRowClass(stock.combined_recommendation);
+            
+            row.innerHTML = `
+                <td>${index + 1}</td>
+                <td><strong>${stock.ticker}</strong></td>
+                <td>${stock.price || 'N/A'}</td>
+                <td>
+                    <div class="progress" style="height: 20px;">
+                        <div class="progress-bar ${getRoutineScoreProgressClass(stock.combined_score)}" 
+                             role="progressbar" 
+                             style="width: ${stock.combined_score}%"
+                             aria-valuenow="${stock.combined_score}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                            ${(stock.combined_score || 0).toFixed(1)}
+                        </div>
+                    </div>
+                </td>
+                <td class="text-center">${(stock.sentiment_analysis?.score || 0).toFixed(1)}</td>
+                <td>
+                    <span class="badge ${getRoutineRecommendationBadgeClass(stock.combined_recommendation)}">
+                        ${stock.combined_recommendation}
+                    </span>
+                </td>
+                <td class="small">${stock.ai_evaluation?.reasoning || stock.sentiment_analysis?.summary || 'No analysis available'}</td>
+            `;
+            
+            tbody.appendChild(row);
+        });
+        
+        // Show rankings container
+        rankingsContainer.style.display = 'block';
+    }
+}
+
+// Helper functions for routine analysis display
+function getRoutineRecommendationRowClass(recommendation) {
+    switch (recommendation?.toLowerCase()) {
+        case 'buy':
+            return 'table-success';
+        case 'hold':
+            return 'table-warning';
+        case 'avoid':
+            return 'table-danger';
+        default:
+            return '';
+    }
+}
+
+function getRoutineRecommendationBadgeClass(recommendation) {
+    switch (recommendation?.toLowerCase()) {
+        case 'buy':
+            return 'bg-success';
+        case 'hold':
+            return 'bg-warning text-dark';
+        case 'avoid':
+            return 'bg-danger';
+        default:
+            return 'bg-secondary';
+    }
+}
+
+function getRoutineScoreProgressClass(score) {
+    if (score >= 75) return 'bg-success';
+    if (score >= 50) return 'bg-warning';
+    return 'bg-danger';
+}
+
+// Excel Download Function
+async function downloadExcel() {
+    try {
+        showSuccess('Preparing Excel download...');
+        
+        // Fetch the Excel file from the server
+        const response = await fetch('/download-excel');
+        
+        if (!response.ok) {
+            if (response.status === 404) {
+                throw new Error('No stock data available for download. Please run the stock fetch job first.');
+            }
+            throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+        }
+        
+        // Get the blob data
+        const blob = await response.blob();
+        
+        // Create a download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        
+        // Set filename with timestamp
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        a.download = `ai_stock_evaluation_matrix_${timestamp}.xlsx`;
+        
+        // Trigger download
+        document.body.appendChild(a);
+        a.click();
+        
+        // Cleanup
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        showSuccess('Excel file downloaded successfully!');
+        
+    } catch (error) {
+        console.error('Error downloading Excel:', error);
+        showError('Download failed: ' + error.message);
+    }
+}
