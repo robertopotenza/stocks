@@ -52,17 +52,32 @@ docker-compose --profile debug up stocks-debug
 
 ### Option 2: Manual Container Configuration
 
-#### Add DNS Servers
+#### Add DNS Servers (Runtime Configuration)
 ```bash
-# In container or Dockerfile
-echo "nameserver 8.8.8.8" >> /etc/resolv.conf
-echo "nameserver 1.1.1.1" >> /etc/resolv.conf
+# Use Docker runtime DNS configuration instead of modifying /etc/resolv.conf
+# /etc/resolv.conf is read-only in modern Docker containers
+
+# Method 1: Docker run with DNS flags
+docker run --dns=8.8.8.8 --dns=1.1.1.1 stocks-extractor
+
+# Method 2: Docker-compose (preferred - already configured in docker-compose.yml)
+# dns:
+#   - 8.8.8.8 
+#   - 1.1.1.1
 ```
 
-#### Add Hosts File Entry
+#### Add Hosts File Entry (Runtime Configuration)
 ```bash
-# Add investing.com IP to hosts file
-echo "5.254.205.57 www.investing.com investing.com" >> /etc/hosts
+# Use Docker runtime hosts configuration instead of modifying /etc/hosts
+# /etc/hosts is read-only in modern Docker containers
+
+# Method 1: Docker run with add-host flags
+docker run --add-host="www.investing.com:5.254.205.57" --add-host="investing.com:5.254.205.57" stocks-extractor
+
+# Method 2: Docker-compose (preferred - already configured in docker-compose.yml)  
+# extra_hosts:
+#   - "www.investing.com:5.254.205.57"
+#   - "investing.com:5.254.205.57"
 ```
 
 #### Set Environment Variables

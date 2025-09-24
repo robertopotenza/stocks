@@ -62,28 +62,32 @@ class NetworkConfigFixer:
         if failed_domains:
             print("🔍 DNS Resolution Issues Detected")
             
-            # Fix 1: Add public DNS servers
+            # Fix 1: Add public DNS servers (runtime configuration)
             fixes.append({
                 'name': 'configure_public_dns',
-                'description': 'Configure public DNS servers (8.8.8.8, 1.1.1.1)',
-                'commands': [
-                    'echo "nameserver 8.8.8.8" >> /etc/resolv.conf',
-                    'echo "nameserver 1.1.1.1" >> /etc/resolv.conf'
+                'description': 'Configure public DNS servers via Docker runtime (not build-time)',
+                'docker_run_flags': [
+                    '--dns=8.8.8.8',
+                    '--dns=1.1.1.1'
                 ],
+                'docker_compose': 'dns: [8.8.8.8, 1.1.1.1]',
                 'env_vars': {
                     'DNS_SERVER': '8.8.8.8'
-                }
+                },
+                'note': 'Do not modify /etc/resolv.conf directly - it is read-only in Docker containers'
             })
             
-            # Fix 2: Add hosts file entries for critical domains
+            # Fix 2: Add hosts file entries for critical domains (runtime configuration)
             if 'www.investing.com' in failed_domains:
                 fixes.append({
                     'name': 'add_hosts_entries',
-                    'description': 'Add investing.com IP addresses to /etc/hosts',
-                    'commands': [
-                        'echo "5.254.205.57 www.investing.com investing.com" >> /etc/hosts',
-                        'echo "104.16.185.223 investing.com" >> /etc/hosts'
-                    ]
+                    'description': 'Add investing.com IP addresses via Docker runtime (not build-time)',
+                    'docker_run_flags': [
+                        '--add-host="www.investing.com:5.254.205.57"',
+                        '--add-host="investing.com:5.254.205.57"'
+                    ],
+                    'docker_compose': 'extra_hosts: ["www.investing.com:5.254.205.57", "investing.com:5.254.205.57"]',
+                    'note': 'Do not modify /etc/hosts directly - it is read-only in Docker containers'
                 })
             
             # Fix 3: Configure proxy if in corporate environment
@@ -144,12 +148,9 @@ RUN apt-get update && apt-get install -y \\
     curl \\
     && rm -rf /var/lib/apt/lists/*
 
-# Configure DNS servers
-RUN echo "nameserver 8.8.8.8" >> /etc/resolv.conf && \\
-    echo "nameserver 1.1.1.1" >> /etc/resolv.conf
-
-# Add investing.com to hosts file for reliability
-RUN echo "5.254.205.57 www.investing.com investing.com" >> /etc/hosts
+# Note: DNS and hosts configuration should be done at runtime
+# /etc/resolv.conf and /etc/hosts are read-only in modern Docker containers
+# Use docker-compose dns and extra_hosts settings instead
 
 # Set environment variables for network configuration
 ENV DNS_SERVER=8.8.8.8
@@ -306,8 +307,9 @@ echo "   HTTPS Proxy: ${HTTPS_PROXY:-<not set>}"
         print("   export DNS_SERVER=8.8.8.8")
         print("   source setup_network_env.sh")
         print()
-        print("2. Add to /etc/hosts:")
-        print("   echo '5.254.205.57 www.investing.com investing.com' >> /etc/hosts")
+        print("2. Docker Runtime Configuration (Recommended):")
+        print("   docker run --dns=8.8.8.8 --add-host='www.investing.com:5.254.205.57' your-image")
+        print("   OR use docker-compose.yml (already configured)")
         print()
         print("3. Configure Proxy (if in corporate network):")
         print("   export HTTPS_PROXY=http://your-proxy:port")
