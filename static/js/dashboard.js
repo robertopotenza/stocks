@@ -174,7 +174,7 @@ async function runAllAnalysis() {
         showSuccess('Starting complete analysis flow...');
         
         // Step 1: Start the data fetch job
-        showSuccess('Step 1/3: Starting data fetch job...');
+        showSuccess('Step 1/5: Starting data fetch job...');
         const runResponse = await fetch('/run');
         if (!runResponse.ok) {
             throw new Error(`Failed to start job: HTTP ${runResponse.status}`);
@@ -188,7 +188,7 @@ async function runAllAnalysis() {
         showSuccess('Data fetch job started. Monitoring progress...');
         
         // Step 2: Poll until job completion
-        showSuccess('Step 2/3: Waiting for data fetch to complete...');
+        showSuccess('Step 2/5: Waiting for data fetch to complete...');
         let attempts = 0;
         const maxAttempts = 120; // 10 minutes max (5s intervals)
         
@@ -223,7 +223,7 @@ async function runAllAnalysis() {
         }
         
         // Step 3: Run routine analysis
-        showSuccess('Step 3/3: Running comprehensive analysis...');
+        showSuccess('Step 3/5: Running comprehensive analysis...');
         
         // Use the existing runRoutineAnalysis logic but inline to handle errors properly
         const analysisResponse = await fetch('/combined-analysis');
@@ -238,6 +238,51 @@ async function runAllAnalysis() {
         
         // Display the routine analysis results
         displayRoutineAnalysis(analysisData);
+        showSuccess('Routine analysis completed successfully!');
+        
+        // Step 4: Run AI evaluation
+        showSuccess('Step 4/5: Running AI stock evaluation...');
+        
+        try {
+            const aiResponse = await fetch('/ai-evaluation');
+            if (aiResponse.ok) {
+                const aiData = await aiResponse.json();
+                if (!aiData.error) {
+                    // Display AI evaluation results
+                    displayAIEvaluation(aiData);
+                    showSuccess('AI evaluation completed successfully!');
+                } else {
+                    showError('AI evaluation returned error: ' + aiData.error);
+                }
+            } else {
+                showError('AI evaluation failed (HTTP ' + aiResponse.status + ') - continuing with other analyses...');
+            }
+        } catch (error) {
+            console.error('AI evaluation error:', error);
+            showError('AI evaluation failed: ' + error.message + ' - continuing with other analyses...');
+        }
+        
+        // Step 5: Run sentiment analysis
+        showSuccess('Step 5/5: Running social media sentiment analysis...');
+        
+        try {
+            const sentimentResponse = await fetch('/sentiment-analysis');
+            if (sentimentResponse.ok) {
+                const sentimentData = await sentimentResponse.json();
+                if (!sentimentData.error) {
+                    // Display sentiment analysis results
+                    displayStandaloneSentiment(sentimentData);
+                    showSuccess('Sentiment analysis completed successfully!');
+                } else {
+                    showError('Sentiment analysis returned error: ' + sentimentData.error);
+                }
+            } else {
+                showError('Sentiment analysis failed (HTTP ' + sentimentResponse.status + ') - continuing...');
+            }
+        } catch (error) {
+            console.error('Sentiment analysis error:', error);
+            showError('Sentiment analysis failed: ' + error.message + ' - continuing...');
+        }
         
         showSuccess('🎉 Complete analysis flow finished successfully!');
         
