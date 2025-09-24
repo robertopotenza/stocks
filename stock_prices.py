@@ -484,6 +484,10 @@ def fetch_stock_data(tickers: List[str]) -> Dict[str, Dict[str, Any]]:
             logger.debug(f"{i}/{total_tickers} {ticker}: Calculating financial metrics...")
             calculate_financial_metrics(stock_data)
             
+            # Calculate AI evaluation flags (columns R-X)
+            logger.debug(f"{i}/{total_tickers} {ticker}: Calculating AI evaluation flags...")
+            calculate_ai_evaluation_flags(stock_data)
+            
             results[ticker] = stock_data
             logger.info(f"{i}/{total_tickers} {ticker}: ${stock_data['Price']} | "
                        f"Sup: {stock_data['Pivot_Support_1']} | Res: {stock_data['Pivot_Resistance_1']}")

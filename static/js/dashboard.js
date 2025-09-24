@@ -1158,3 +1158,47 @@ function getRoutineScoreProgressClass(score) {
     if (score >= 50) return 'bg-warning';
     return 'bg-danger';
 }
+
+// Excel Download Function
+async function downloadExcel() {
+    try {
+        showSuccess('Preparing Excel download...');
+        
+        // Fetch the Excel file from the server
+        const response = await fetch('/download-excel');
+        
+        if (!response.ok) {
+            if (response.status === 404) {
+                throw new Error('No stock data available for download. Please run the stock fetch job first.');
+            }
+            throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+        }
+        
+        // Get the blob data
+        const blob = await response.blob();
+        
+        // Create a download link
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.style.display = 'none';
+        a.href = url;
+        
+        // Set filename with timestamp
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        a.download = `ai_stock_evaluation_matrix_${timestamp}.xlsx`;
+        
+        // Trigger download
+        document.body.appendChild(a);
+        a.click();
+        
+        // Cleanup
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        showSuccess('Excel file downloaded successfully!');
+        
+    } catch (error) {
+        console.error('Error downloading Excel:', error);
+        showError('Download failed: ' + error.message);
+    }
+}
