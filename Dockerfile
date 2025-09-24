@@ -67,9 +67,6 @@ COPY requirements.txt .
 # Install Python dependencies with trusted hosts for SSL issues
 RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org -r requirements.txt
 
-# Download NLTK data including VADER lexicon for sentiment analysis
-RUN python -c "import nltk; nltk.download('vader_lexicon', quiet=True)"
-
 # Copy application code
 COPY . .
 
@@ -85,6 +82,9 @@ RUN useradd --create-home --shell /bin/bash app
 RUN chown -R app:app /app
 
 USER app
+
+# Download NLTK data including VADER lexicon for sentiment analysis as the app user
+RUN python -c "import nltk; nltk.download('vader_lexicon', quiet=True)"
 
 # Set environment variables for network configuration
 ENV DNS_SERVER=8.8.8.8

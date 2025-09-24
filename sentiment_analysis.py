@@ -52,7 +52,10 @@ class SentimentAnalyzer:
                 'polarity': 0.0,
                 'subjectivity': 0.0,
                 'compound': 0.0,
-                'classification': 'neutral'
+                'classification': 'neutral',
+                'pos': 0.0,
+                'neu': 1.0,
+                'neg': 0.0
             }
         
         # TextBlob analysis
