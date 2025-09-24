@@ -176,6 +176,80 @@ def find_recent_support_resistance(data: List[Dict[str, Any]], lookback_days: in
         return {}
 
 
+def calculate_fibonacci_levels(high: float, low: float) -> Dict[str, float]:
+    """
+    Calculate Fibonacci retracement levels from swing high and low
+    
+    Args:
+        high: Swing high price
+        low: Swing low price
+        
+    Returns:
+        Dictionary containing Fibonacci levels (23.6%, 38.2%, 50%, 61.8%)
+    """
+    try:
+        if not isinstance(high, (int, float)) or not isinstance(low, (int, float)) or high <= low:
+            return {}
+        
+        # Calculate the range
+        price_range = high - low
+        
+        # Calculate Fibonacci levels (for downtrend, these act as support)
+        fibonacci_levels = {
+            'fib_23_6': round(high - (price_range * 0.236), 2),
+            'fib_38_2': round(high - (price_range * 0.382), 2),
+            'fib_50_0': round(high - (price_range * 0.500), 2),
+            'fib_61_8': round(high - (price_range * 0.618), 2)
+        }
+        
+        return fibonacci_levels
+        
+    except Exception as e:
+        logger.error(f"Error calculating Fibonacci levels: {e}")
+        return {}
+
+
+def find_swing_high_low(data: List[Dict[str, Any]], lookback_days: int = 60) -> Dict[str, float]:
+    """
+    Find swing high and low from historical data
+    
+    Args:
+        data: List of historical price data dictionaries
+        lookback_days: Number of days to look back for swing points
+        
+    Returns:
+        Dictionary containing swing_high and swing_low
+    """
+    try:
+        if not data or len(data) < 5:
+            return {}
+        
+        # Sort data by date to ensure proper chronology
+        sorted_data = sorted(data, key=lambda x: x['date'])
+        
+        # Use the specified lookback period or all available data if less
+        recent_data = sorted_data[-min(lookback_days, len(sorted_data)):]
+        
+        # Find swing high and low
+        highs = [float(d['high']) for d in recent_data if isinstance(d.get('high'), (int, float, str))]
+        lows = [float(d['low']) for d in recent_data if isinstance(d.get('low'), (int, float, str))]
+        
+        if not highs or not lows:
+            return {}
+        
+        swing_high = max(highs)
+        swing_low = min(lows)
+        
+        return {
+            'swing_high': round(swing_high, 2),
+            'swing_low': round(swing_low, 2)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error finding swing high/low: {e}")
+        return {}
+
+
 def calculate_technical_levels(ticker: str) -> Dict[str, Any]:
     """
     Calculate comprehensive technical support and resistance levels for a ticker
@@ -199,6 +273,11 @@ def calculate_technical_levels(ticker: str) -> Dict[str, Any]:
                 'pivot_resistance_2': 'N/A',
                 'recent_support': 'N/A',
                 'recent_resistance': 'N/A',
+                'swing_high': 'N/A',
+                'swing_low': 'N/A',
+                'fib_38_2': 'N/A',
+                'fib_50_0': 'N/A',
+                'fib_61_8': 'N/A',
                 'error': 'Insufficient historical data'
             }
         
@@ -208,6 +287,16 @@ def calculate_technical_levels(ticker: str) -> Dict[str, Any]:
         # Calculate recent support/resistance
         recent_levels = find_recent_support_resistance(historical_data, lookback_days=20)
         
+        # Calculate swing high/low and Fibonacci levels
+        swing_levels = find_swing_high_low(historical_data, lookback_days=60)
+        fibonacci_levels = {}
+        
+        if swing_levels and 'swing_high' in swing_levels and 'swing_low' in swing_levels:
+            fibonacci_levels = calculate_fibonacci_levels(
+                swing_levels['swing_high'], 
+                swing_levels['swing_low']
+            )
+        
         # Combine results with defensive checks
         result = {
             'pivot_support_1': pivot_levels.get('support_1', 'N/A') if isinstance(pivot_levels, dict) else 'N/A',
@@ -216,6 +305,12 @@ def calculate_technical_levels(ticker: str) -> Dict[str, Any]:
             'pivot_resistance_2': pivot_levels.get('resistance_2', 'N/A') if isinstance(pivot_levels, dict) else 'N/A',
             'recent_support': recent_levels.get('recent_support_1', 'N/A') if isinstance(recent_levels, dict) else 'N/A',
             'recent_resistance': recent_levels.get('recent_resistance_1', 'N/A') if isinstance(recent_levels, dict) else 'N/A',
+            'swing_high': swing_levels.get('swing_high', 'N/A') if isinstance(swing_levels, dict) else 'N/A',
+            'swing_low': swing_levels.get('swing_low', 'N/A') if isinstance(swing_levels, dict) else 'N/A',
+            'fib_23_6': fibonacci_levels.get('fib_23_6', 'N/A') if isinstance(fibonacci_levels, dict) else 'N/A',
+            'fib_38_2': fibonacci_levels.get('fib_38_2', 'N/A') if isinstance(fibonacci_levels, dict) else 'N/A',
+            'fib_50_0': fibonacci_levels.get('fib_50_0', 'N/A') if isinstance(fibonacci_levels, dict) else 'N/A',
+            'fib_61_8': fibonacci_levels.get('fib_61_8', 'N/A') if isinstance(fibonacci_levels, dict) else 'N/A',
             'data_points': len(historical_data)
         }
         
@@ -230,5 +325,11 @@ def calculate_technical_levels(ticker: str) -> Dict[str, Any]:
             'pivot_resistance_2': 'N/A',
             'recent_support': 'N/A',
             'recent_resistance': 'N/A',
+            'swing_high': 'N/A',
+            'swing_low': 'N/A',
+            'fib_23_6': 'N/A',
+            'fib_38_2': 'N/A',
+            'fib_50_0': 'N/A',
+            'fib_61_8': 'N/A',
             'error': str(e)
         }
