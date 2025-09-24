@@ -11,6 +11,9 @@ document.addEventListener('DOMContentLoaded', function() {
     loadTickerCount();
     loadLogs();
     
+    // Initialize ticker limit selector
+    initializeTickerLimit();
+    
     // Start periodic status updates
     startStatusUpdates();
 });
@@ -39,6 +42,34 @@ function stopStatusUpdates() {
         clearInterval(statusUpdateInterval);
         statusUpdateInterval = null;
     }
+}
+
+// Ticker Limit Management Functions
+
+// Initialize ticker limit selector with localStorage persistence
+function initializeTickerLimit() {
+    const tickerLimitSelect = document.getElementById('ticker-limit');
+    if (!tickerLimitSelect) {
+        console.warn('Ticker limit selector not found');
+        return;
+    }
+    
+    // Load saved value from localStorage or default to "10"
+    const savedLimit = localStorage.getItem('tickerLimit') || '10';
+    tickerLimitSelect.value = savedLimit;
+    
+    // Add change event listener to save to localStorage
+    tickerLimitSelect.addEventListener('change', function() {
+        const selectedLimit = this.value;
+        localStorage.setItem('tickerLimit', selectedLimit);
+        console.log('Ticker limit changed to:', selectedLimit);
+    });
+}
+
+// Get current ticker limit value
+function getTickerLimit() {
+    const tickerLimitSelect = document.getElementById('ticker-limit');
+    return tickerLimitSelect ? tickerLimitSelect.value : '10';
 }
 
 // Refresh job status
@@ -226,7 +257,9 @@ async function runAllAnalysis() {
         showSuccess('Step 3/5: Running comprehensive analysis...');
         
         // Use the existing runRoutineAnalysis logic but inline to handle errors properly
-        const analysisResponse = await fetch('/combined-analysis');
+        // Get current ticker limit and include as query parameter
+        const limit = getTickerLimit();
+        const analysisResponse = await fetch(`/combined-analysis?limit=${encodeURIComponent(limit)}`);
         if (!analysisResponse.ok) {
             throw new Error(`Analysis failed: HTTP ${analysisResponse.status}`);
         }
@@ -595,7 +628,9 @@ async function runQuickEvaluation() {
         
         showSuccess('Running quick AI evaluation with fresh data...');
         
-        const response = await fetch('/quick-evaluation');
+        // Get current ticker limit and include as query parameter
+        const limit = getTickerLimit();
+        const response = await fetch(`/quick-evaluation?limit=${encodeURIComponent(limit)}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -776,7 +811,9 @@ async function runSentimentAnalysis() {
         
         showSuccess('Analyzing social media sentiment...');
         
-        const response = await fetch('/sentiment-analysis');
+        // Get current ticker limit and include as query parameter
+        const limit = getTickerLimit();
+        const response = await fetch(`/sentiment-analysis?limit=${encodeURIComponent(limit)}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -976,7 +1013,9 @@ async function runRoutineAnalysis() {
         
         showSuccess('Running comprehensive routine analysis...');
         
-        const response = await fetch('/combined-analysis');
+        // Get current ticker limit and include as query parameter
+        const limit = getTickerLimit();
+        const response = await fetch(`/combined-analysis?limit=${encodeURIComponent(limit)}`);
         if (!response.ok) {
             throw new Error(`HTTP error! status: ${response.status}`);
         }

@@ -80,6 +80,50 @@ def get_cached_sentiment_for_tickers(tickers: List[str], ttl_minutes: int = 5) -
     
     return sentiment_data
 
+def parse_ticker_limit(limit_param: str, default_limit: int = 10) -> int:
+    """
+    Parse and validate the ticker limit parameter.
+    
+    Args:
+        limit_param: The limit parameter value from request.args.get('limit')
+        default_limit: Default limit to use if invalid or missing
+        
+    Returns:
+        The validated limit as an integer, or None for 'all'
+    """
+    if not limit_param:
+        return default_limit
+    
+    # Handle 'all' case (case-insensitive)
+    if limit_param.lower() == 'all':
+        return None  # None means no limit
+    
+    # Try to parse as integer
+    try:
+        limit = int(limit_param)
+        if limit <= 0:
+            logger.warning(f"Invalid negative limit received: {limit_param}, using default: {default_limit}")
+            return default_limit
+        return limit
+    except ValueError:
+        logger.warning(f"Invalid non-integer limit received: {limit_param}, using default: {default_limit}")
+        return default_limit
+
+def apply_ticker_limit(tickers: list, limit: int = None) -> list:
+    """
+    Apply ticker limit to a list of tickers.
+    
+    Args:
+        tickers: List of ticker symbols
+        limit: Maximum number of tickers to return, None for no limit
+        
+    Returns:
+        Limited list of tickers
+    """
+    if limit is None:
+        return tickers
+    return tickers[:limit]
+
 def run_stock_fetcher_async():
     """Run the stock fetcher in a background thread."""
     try:
@@ -378,9 +422,12 @@ def get_quick_evaluation():
                 'error': 'No valid tickers found in file.'
             }), 400
         
-        # Limit to first 10 tickers for quick evaluation
-        limited_tickers = tickers[:10]
-        logger.info(f"Running quick evaluation on {len(limited_tickers)} tickers")
+        # Parse and apply ticker limit from request parameter
+        limit_param = request.args.get('limit')
+        limit = parse_ticker_limit(limit_param, default_limit=10)
+        limited_tickers = apply_ticker_limit(tickers, limit)
+        
+        logger.info(f"Running quick evaluation on {len(limited_tickers)} tickers (limit: {limit_param or 'default'})")
         
         # Fetch fresh stock data
         stock_data = fetch_stock_data(limited_tickers)
@@ -432,10 +479,12 @@ def get_sentiment_analysis():
                 'error': 'No tickers found in the file.'
             }), 400
         
-        # Limit tickers to avoid overwhelming the APIs
-        limited_tickers = tickers[:10]
+        # Parse and apply ticker limit from request parameter
+        limit_param = request.args.get('limit')
+        limit = parse_ticker_limit(limit_param, default_limit=10)
+        limited_tickers = apply_ticker_limit(tickers, limit)
         
-        logger.info(f"Getting sentiment analysis for {len(limited_tickers)} tickers")
+        logger.info(f"Getting sentiment analysis for {len(limited_tickers)} tickers (limit: {limit_param or 'default'})")
         
         # Use cached sentiment analysis
         sentiment_result = get_cached_sentiment_for_tickers(limited_tickers, ttl_minutes=5)
@@ -508,10 +557,12 @@ def get_combined_analysis():
                 'error': 'No tickers found in the file.'
             }), 400
         
-        # Limit tickers to avoid overwhelming the APIs (max 10 for efficiency)
-        limited_tickers = tickers[:10]
+        # Parse and apply ticker limit from request parameter
+        limit_param = request.args.get('limit')
+        limit = parse_ticker_limit(limit_param, default_limit=10)
+        limited_tickers = apply_ticker_limit(tickers, limit)
         
-        logger.info(f"Running combined analysis on {len(limited_tickers)} tickers")
+        logger.info(f"Running combined analysis on {len(limited_tickers)} tickers (limit: {limit_param or 'default'})")
         
         # Get cached sentiment analysis data
         cached_sentiment = get_cached_sentiment_for_tickers(limited_tickers, ttl_minutes=5)
