@@ -68,10 +68,7 @@ class StockEvaluator:
         Returns:
             Dictionary containing evaluation results and scores
         """
-        # Skip if no price data
-        price = data.get('Price')
-        if not isinstance(price, (int, float)) or price <= 0:
-            return None
+        # Always proceed with evaluation since we use neutral defaults now
         
         # Calculate individual component scores
         technical_score = self._score_technical_position(data)
@@ -127,167 +124,34 @@ class StockEvaluator:
                 'upside_potential': round(upside_score, 2),
                 'sentiment': round(sentiment_score, 2)
             },
-            'price': price,
-            'pe_ratio': data.get('PE_Ratio', 'N/A'),
-            'risk_reward_ratio': data.get('Risk_Reward_Ratio', 'N/A'),
-            'distance_from_52w_high': data.get('Distance_from_52w_High_Pct', 'N/A'),
-            'valuation_flag': data.get('Valuation_Flag', 'N/A'),
-            'entry_flag': data.get('Entry_Opportunity_Flag', 'N/A'),
-            'price_level_flag': data.get('Price_Level_Flag', 'N/A'),
             'sentiment_data': sentiment_info,
             'sentiment': sentiment_data.get('overall_sentiment_score', 0.0) if sentiment_data else 0.0
         }
     
     def _score_technical_position(self, data: Dict[str, Any]) -> float:
-        """Score based on technical position relative to support/resistance."""
-        score = 50.0  # Neutral base score
-        
-        price = data.get('Price')
-        recent_support = data.get('Recent_Support')
-        recent_resistance = data.get('Recent_Resistance')
-        pivot_support = data.get('Pivot_Support_1')
-        pivot_resistance = data.get('Pivot_Resistance_1')
-        
-        if not isinstance(price, (int, float)):
-            return score
-        
-        # Score based on position relative to support levels
-        if isinstance(recent_support, (int, float)) and recent_support > 0:
-            support_distance = ((price - recent_support) / recent_support) * 100
-            if support_distance < 2:  # Very close to support
-                score += 30
-            elif support_distance < 5:  # Near support
-                score += 20
-            elif support_distance > 20:  # Far from support
-                score -= 10
-        
-        # Score based on position relative to resistance levels  
-        if isinstance(recent_resistance, (int, float)) and recent_resistance > price:
-            resistance_distance = ((recent_resistance - price) / price) * 100
-            if resistance_distance > 10:  # Good upside room
-                score += 20
-            elif resistance_distance < 3:  # Near resistance
-                score -= 20
-        
-        # Additional scoring from pivot levels
-        if isinstance(pivot_support, (int, float)) and isinstance(pivot_resistance, (int, float)):
-            if pivot_support > 0 and pivot_resistance > price:
-                position_in_range = (price - pivot_support) / (pivot_resistance - pivot_support)
-                if position_in_range < 0.3:  # In lower 30% of range
-                    score += 15
-                elif position_in_range > 0.7:  # In upper 70% of range
-                    score -= 10
-        
-        return max(0, min(100, score))
+        """Score based on technical position - using neutral default since fields are removed."""
+        # Return neutral score since technical fields (Support/Resistance) are removed
+        return 50.0
     
     def _score_valuation(self, data: Dict[str, Any]) -> float:
-        """Score based on valuation metrics."""
-        score = 50.0  # Neutral base score
-        
-        pe_ratio = data.get('PE_Ratio')
-        valuation_flag = data.get('Valuation_Flag')
-        
-        # Score based on PE ratio
-        if isinstance(pe_ratio, (int, float)) and pe_ratio > 0:
-            if pe_ratio < 15:  # Very attractive valuation
-                score += 40
-            elif pe_ratio < 20:  # Good valuation
-                score += 25
-            elif pe_ratio < 25:  # Fair valuation
-                score += 10
-            elif pe_ratio < 30:  # Slightly expensive
-                score -= 10
-            else:  # Expensive
-                score -= 30
-        
-        # Adjust based on valuation flag
-        if valuation_flag == "Undervalued":
-            score += 20
-        elif valuation_flag == "Overvalued":
-            score -= 25
-        
-        return max(0, min(100, score))
+        """Score based on valuation metrics - using neutral default since fields are removed."""
+        # Return neutral score since valuation fields (PE_Ratio, Valuation_Flag) are removed
+        return 50.0
     
     def _score_risk_reward(self, data: Dict[str, Any]) -> float:
-        """Score based on risk/reward ratio using standardized normalization."""
-        risk_reward = data.get('Risk_Reward_Ratio')
-        entry_flag = data.get('Entry_Opportunity_Flag')
-        
-        # Base score using direct ratio normalization as specified
-        # RR Score = min(100, (RR/Max RR) × 100)
-        # Using max RR = 10 as suggested in requirements
-        max_rr = 10.0
-        
-        if isinstance(risk_reward, (int, float)) and risk_reward > 0:
-            # Direct ratio normalization: RR Score = min(100, (RR/Max RR) × 100)
-            score = min(100, (risk_reward / max_rr) * 100)
-        else:
-            score = 0.0  # No risk/reward data available
-        
-        # Adjust based on entry flag (small adjustment to the normalized score)
-        if entry_flag == "Favorable":
-            score = min(100, score + 10)  # Bonus for favorable entry
-        elif entry_flag == "Unfavorable":
-            score = max(0, score - 15)   # Penalty for unfavorable entry
-        
-        return max(0, min(100, score))
+        """Score based on risk/reward ratio - using neutral default since fields are removed."""
+        # Return neutral score since risk/reward fields are removed
+        return 50.0
     
     def _score_momentum(self, data: Dict[str, Any]) -> float:
-        """Score based on price momentum and 52-week positioning."""
-        score = 50.0  # Neutral base score
-        
-        dist_from_high = data.get('Distance_from_52w_High_Pct')
-        dist_from_low = data.get('Distance_from_52w_Low_Pct')
-        price_level_flag = data.get('Price_Level_Flag')
-        
-        # Score based on distance from 52-week high
-        if isinstance(dist_from_high, (int, float)):
-            if dist_from_high > 50:  # Far from high - potential upside
-                score += 25
-            elif dist_from_high > 30:  # Moderate distance from high
-                score += 15
-            elif dist_from_high < 5:  # Very close to high - may be topped out
-                score -= 15
-        
-        # Score based on distance from 52-week low
-        if isinstance(dist_from_low, (int, float)):
-            if dist_from_low < 20:  # Close to low - may be bottoming
-                score += 10
-            elif dist_from_low > 80:  # Far from low - good momentum
-                score += 15
-        
-        # Adjust based on price level flag
-        if price_level_flag == "Near Bottom":
-            score += 20
-        elif price_level_flag == "Near Top":
-            score -= 15
-        
-        return max(0, min(100, score))
+        """Score based on price momentum - using neutral default since fields are removed."""
+        # Return neutral score since momentum fields (Distance_from_52w_High_Pct, etc.) are removed
+        return 50.0
     
     def _score_upside_potential(self, data: Dict[str, Any]) -> float:
-        """Score based on upside vs downside potential."""
-        score = 50.0  # Neutral base score
-        
-        upside_potential = data.get('Upside_Potential_Pct')
-        downside_risk = data.get('Downside_Risk_Pct')
-        
-        # Score based on upside potential
-        if isinstance(upside_potential, (int, float)):
-            if upside_potential > 20:  # High upside potential
-                score += 30
-            elif upside_potential > 10:  # Moderate upside
-                score += 15
-            elif upside_potential < 5:  # Limited upside
-                score -= 10
-        
-        # Penalize high downside risk
-        if isinstance(downside_risk, (int, float)):
-            if downside_risk > 15:  # High downside risk
-                score -= 20
-            elif downside_risk > 10:  # Moderate downside risk
-                score -= 10
-        
-        return max(0, min(100, score))
+        """Score based on upside potential - using neutral default since fields are removed."""
+        # Return neutral score since upside/downside fields are removed
+        return 50.0
     
     def _score_sentiment(self, data: Dict[str, Any]) -> float:
         """Score based on social media sentiment analysis."""
@@ -333,61 +197,33 @@ class StockEvaluator:
         return max(0, min(100, score))
     
     def _generate_commentary(self, ticker: str, data: Dict[str, Any], scores: Dict[str, float]) -> str:
-        """Generate AI commentary for the stock."""
-        price = data.get('Price')
-        pe_ratio = data.get('PE_Ratio')
-        valuation_flag = data.get('Valuation_Flag', 'N/A')
-        risk_reward = data.get('Risk_Reward_Ratio')
-        dist_from_high = data.get('Distance_from_52w_High_Pct')
-        upside_potential = data.get('Upside_Potential_Pct')
-        entry_flag = data.get('Entry_Opportunity_Flag', 'N/A')
-        
+        """Generate AI commentary for the stock based on available data."""
         commentary_parts = []
         
-        # Valuation assessment
-        if isinstance(pe_ratio, (int, float)):
-            if pe_ratio < 15:
-                commentary_parts.append(f"attractively valued at {pe_ratio:.1f}x earnings")
-            elif pe_ratio < 25:
-                commentary_parts.append(f"fairly priced at {pe_ratio:.1f}x earnings")
-            else:
-                commentary_parts.append(f"expensive at {pe_ratio:.1f}x earnings")
-        elif valuation_flag != 'N/A':
-            commentary_parts.append(f"appears {valuation_flag.lower()}")
+        # Since removed fields are no longer available, use neutral scoring-based commentary
+        total_score = (
+            scores['technical'] * self.weights['technical_position'] +
+            scores['valuation'] * self.weights['valuation'] +
+            scores['risk_reward'] * self.weights['risk_reward'] +
+            scores['momentum'] * self.weights['momentum'] +
+            scores['upside'] * self.weights['upside_potential']
+        )
         
-        # Technical position
-        if scores['technical'] > 70:
-            commentary_parts.append("strong technical setup near support levels")
-        elif scores['technical'] < 30:
-            commentary_parts.append("challenging technical position near resistance")
+        # Overall assessment based on score components
+        if total_score >= 70:
+            commentary_parts.append("shows strong overall characteristics")
+        elif total_score >= 60:
+            commentary_parts.append("presents moderate investment appeal")
+        elif total_score >= 40:
+            commentary_parts.append("shows neutral investment characteristics")
         else:
-            commentary_parts.append("neutral technical position")
+            commentary_parts.append("presents some investment challenges")
         
-        # Risk/reward assessment
-        if isinstance(risk_reward, (int, float)):
-            if risk_reward > 2:
-                commentary_parts.append(f"excellent risk/reward ratio of {risk_reward:.1f}")
-            elif risk_reward > 1.5:
-                commentary_parts.append(f"favorable risk/reward of {risk_reward:.1f}")
-            else:
-                commentary_parts.append(f"limited risk/reward of {risk_reward:.1f}")
-        elif entry_flag == "Favorable":
-            commentary_parts.append("favorable entry opportunity")
-        
-        # Distance from highs
-        if isinstance(dist_from_high, (int, float)) and dist_from_high > 30:
-            commentary_parts.append(f"{dist_from_high:.0f}% below 52-week high")
-        
-        # Upside potential
-        if isinstance(upside_potential, (int, float)) and upside_potential > 10:
-            commentary_parts.append(f"{upside_potential:.0f}% upside potential to resistance")
-        
-        # Sentiment analysis
+        # Sentiment analysis (if available)
         sentiment_data = data.get('sentiment_data', {})
         if sentiment_data and sentiment_data.get('total_mentions', 0) > 0:
             sentiment_score = sentiment_data.get('overall_sentiment_score', 0)
             mentions = sentiment_data.get('total_mentions', 0)
-            trend = sentiment_data.get('trend_direction', 'stable')
             
             if sentiment_score > 0.2:
                 sentiment_desc = "very positive"
@@ -401,13 +237,13 @@ class StockEvaluator:
                 sentiment_desc = "neutral"
             
             if mentions > 20:
-                commentary_parts.append(f"{sentiment_desc} social media sentiment with {mentions} mentions")
+                commentary_parts.append(f"with {sentiment_desc} social media sentiment ({mentions} mentions)")
             elif mentions > 0:
-                commentary_parts.append(f"{sentiment_desc} sentiment from social media")
+                commentary_parts.append(f"with {sentiment_desc} social media sentiment")
         
         # Combine commentary
         if commentary_parts:
-            return f"{ticker} is " + ", ".join(commentary_parts) + "."
+            return f"{ticker} " + ", ".join(commentary_parts) + "."
         else:
             return f"{ticker} has limited data for comprehensive analysis."
     
