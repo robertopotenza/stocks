@@ -14,6 +14,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize ticker limit selector
     initializeTickerLimit();
     
+    // Load technical indicators data on page load
+    loadTechnicalIndicators();
+    
     // Start periodic status updates
     startStatusUpdates();
 });
@@ -1237,9 +1240,9 @@ async function loadTechnicalIndicators() {
         
     } catch (error) {
         console.error('Error loading technical indicators:', error);
-        showError('Failed to load technical indicators: ' + error.message);
+        console.log('Technical indicators will be available after running data extraction');
         
-        // Show placeholder
+        // Show placeholder instead of error for initial load
         if (loadingElement) loadingElement.style.display = 'none';
         if (placeholderSection) placeholderSection.style.display = 'block';
     }
@@ -1254,15 +1257,24 @@ function displayTechnicalIndicators(stocks) {
     // Hide loading
     if (loadingElement) loadingElement.style.display = 'none';
     
+    console.log('Processing technical indicators for', stocks.length, 'stocks');
+    
     // Filter stocks that have technical indicators data
     const technicalCols = ['Woodies_Pivot', 'RSI_14', 'EMA20', 'SMA50', 'MACD_value', 'Volume_daily'];
     const stocksWithTech = stocks.filter(stock => {
-        return technicalCols.some(col => stock[col] != null && stock[col] !== 'N/A' && stock[col] !== '');
+        const hasData = technicalCols.some(col => stock[col] != null && stock[col] !== 'N/A' && stock[col] !== '');
+        if (hasData) {
+            console.log('Found technical data for:', stock.Ticker);
+        }
+        return hasData;
     });
+    
+    console.log('Found', stocksWithTech.length, 'stocks with technical indicators');
     
     if (stocksWithTech.length === 0) {
         // Show placeholder if no data
         if (placeholderSection) placeholderSection.style.display = 'block';
+        console.log('No technical indicators data found, showing placeholder');
         return;
     }
     
@@ -1274,6 +1286,7 @@ function displayTechnicalIndicators(stocks) {
     
     // Show summary section
     if (summarySection) summarySection.style.display = 'block';
+    console.log('Technical indicators section displayed');
 }
 
 // Update technical indicators summary stats
@@ -1315,7 +1328,12 @@ function updateTechnicalSummary(allStocks, stocksWithTech) {
 // Update technical indicators table
 function updateTechnicalTable(stocksWithTech) {
     const tbody = document.getElementById('technical-indicators-tbody');
-    if (!tbody) return;
+    if (!tbody) {
+        console.error('Technical indicators table body not found');
+        return;
+    }
+    
+    console.log('Updating technical indicators table with', stocksWithTech.length, 'stocks');
     
     // Sort by ticker name
     const sortedStocks = stocksWithTech.sort((a, b) => (a.Ticker || '').localeCompare(b.Ticker || ''));
@@ -1353,6 +1371,8 @@ function updateTechnicalTable(stocksWithTech) {
             </tr>
         `;
     }).join('');
+    
+    console.log('Technical indicators table updated successfully');
 }
 
 // Helper function to format technical values
