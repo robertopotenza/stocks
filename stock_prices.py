@@ -23,8 +23,58 @@ from logging_config import get_logger
 logger = get_logger('stocks_app.stock_prices')
 
 # Configuration variables - can be set via environment variables or modified here
-TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY") or os.getenv("api_key", "your_twelvedata_api_key")
+
+
+def _normalize_api_key(value: Optional[str]) -> Optional[str]:
+    """Return a cleaned API key or ``None`` when the value is effectively missing."""
+
+    if not value:
+        return None
+
+    normalized = value.strip()
+    if not normalized:
+        return None
+
+    placeholder_values = {
+        "your_twelvedata_api_key",
+        "your_api_key",
+        "changeme",
+        "replace_me",
+    }
+
+    lower_normalized = normalized.lower()
+    if lower_normalized in placeholder_values or lower_normalized.startswith("your_"):
+        return None
+
+    return normalized
+
+
+def _load_api_key_from_sources() -> Optional[str]:
+    """Attempt to load the Twelve Data API key from multiple sources."""
+
+    for candidate in (
+        os.getenv("TWELVEDATA_API_KEY"),
+        os.getenv("api_key"),
+    ):
+        normalized = _normalize_api_key(candidate)
+        if normalized:
+            return normalized
+
+    # Try optional config module (if present) without raising import errors
+    try:
+        import config  # type: ignore
+
+        return _normalize_api_key(getattr(config, "TWELVEDATA_API_KEY", None))
+    except Exception:
+        return None
+
+
+TWELVEDATA_API_KEY = _load_api_key_from_sources()
 TICKERS_FILE = os.getenv("TICKERS_FILE", "tickers.xlsx")
+
+_API_KEY_MISSING_LOGGED = False
+_API_KEY_INVALID = False
+_API_KEY_INVALID_LOGGED = False
 
 
 def check_dns_resolution(hostname: str) -> bool:
@@ -111,6 +161,62 @@ def make_api_request_with_retry(url: str, params: Dict[str, Any], max_retries: i
     return None
 
 
+def _api_key_configured() -> bool:
+    return TWELVEDATA_API_KEY is not None and not _API_KEY_INVALID
+
+
+def _log_missing_api_key_hint() -> None:
+    global _API_KEY_MISSING_LOGGED
+
+    if _API_KEY_MISSING_LOGGED:
+        return
+
+    logger.warning("⚠️ No Twelve Data API key configured!")
+    logger.warning("Set TWELVEDATA_API_KEY environment variable with your API key")
+    logger.warning("Get your free API key from: https://twelvedata.com/")
+    logger.info("Example:")
+    logger.info("   export TWELVEDATA_API_KEY=your_api_key_here")
+    logger.warning("Proceeding with mock data for testing...")
+    _API_KEY_MISSING_LOGGED = True
+
+
+def _mark_api_key_invalid(message: str) -> None:
+    global _API_KEY_INVALID, _API_KEY_INVALID_LOGGED
+
+    if not _API_KEY_INVALID:
+        _API_KEY_INVALID = True
+
+    if _API_KEY_INVALID_LOGGED:
+        return
+
+    logger.error("🚫 Twelve Data rejected the configured API key: %s", message)
+    logger.error("💡 Switching to mock data for the remainder of this run.")
+    logger.info("👉 Update the TWELVEDATA_API_KEY environment variable with a valid key from https://twelvedata.com/pricing")
+    _API_KEY_INVALID_LOGGED = True
+
+
+def _is_api_key_error(message: str) -> bool:
+    lowered = message.lower()
+    if "api key" not in lowered and "apikey" not in lowered:
+        return False
+
+    keywords = ["missing", "not specified", "invalid", "incorrect", "denied"]
+    return any(keyword in lowered for keyword in keywords)
+
+
+def _handle_twelvedata_error(ticker: str, context: str, payload: Dict[str, Any]) -> bool:
+    """Return True when the error indicates an API key issue that should stop further calls."""
+
+    message = str(payload.get("message") or payload.get("note") or payload)
+    logger.error(f"API error for {ticker} {context}: {message}")
+
+    if _is_api_key_error(message):
+        _mark_api_key_invalid(message)
+        return True
+
+    return False
+
+
 def get_stock_data_from_api(ticker: str) -> Dict[str, Any]:
     """
     Fetch stock data from Twelve Data API.
@@ -121,10 +227,11 @@ def get_stock_data_from_api(ticker: str) -> Dict[str, Any]:
     Returns:
         Dictionary containing stock data
     """
-    if TWELVEDATA_API_KEY in ["your_twelvedata_api_key", None, ""]:
-        logger.warning(f"No API key configured, using mock data for {ticker}")
+    if not _api_key_configured():
+        if TWELVEDATA_API_KEY is None:
+            _log_missing_api_key_hint()
         return get_mock_stock_data(ticker)
-    
+
     logger.info(f"🔄 Fetching data for {ticker} from Twelve Data API...")
     
     try:
@@ -145,7 +252,8 @@ def get_stock_data_from_api(ticker: str) -> Dict[str, Any]:
                 
                 # Check for API error in response
                 if 'status' in price_data and price_data['status'] == 'error':
-                    logger.error(f"API error for {ticker} price: {price_data.get('message', 'Unknown error')}")
+                    if _handle_twelvedata_error(ticker, 'price', price_data):
+                        return get_mock_stock_data(ticker)
                 elif 'price' in price_data:
                     current_price = float(price_data['price'])
                     logger.info(f"✅ Got price for {ticker}: ${current_price}")
@@ -170,11 +278,12 @@ def get_stock_data_from_api(ticker: str) -> Dict[str, Any]:
             try:
                 quote_data = quote_response.json()
                 logger.debug(f"Quote API response for {ticker}: {quote_data}")
-                
+
                 # Check for API error in response
                 if 'status' in quote_data and quote_data['status'] == 'error':
-                    logger.error(f"API error for {ticker} quote: {quote_data.get('message', 'Unknown error')}")
-                    quote_data = {}  # Reset to empty dict on error
+                    if _handle_twelvedata_error(ticker, 'quote', quote_data):
+                        return get_mock_stock_data(ticker)
+                    quote_data = {}  # Reset to empty dict on non-key error
             except (ValueError, TypeError) as e:
                 logger.error(f"Error parsing quote data for {ticker}: {e}")
                 quote_data = {}
@@ -202,7 +311,7 @@ def get_stock_data_from_api(ticker: str) -> Dict[str, Any]:
         if current_price and isinstance(current_price, (int, float)):
             try:
                 # Calculate technical levels using the existing function
-                technical_levels = calculate_technical_levels(current_price)
+                technical_levels = calculate_technical_levels(ticker)
                 stock_data.update(technical_levels)
             except Exception as e:
                 logger.warning(f"Could not calculate technical levels for {ticker}: {e}")
@@ -261,7 +370,7 @@ def get_mock_stock_data(ticker: str) -> Dict[str, Any]:
     
     # Calculate technical levels
     try:
-        technical_levels = calculate_technical_levels(current_price)
+        technical_levels = calculate_technical_levels(ticker)
         stock_data.update(technical_levels)
     except Exception as e:
         logger.warning(f"Could not calculate technical levels for {ticker}: {e}")
@@ -398,13 +507,8 @@ def main():
     logger.info("=" * 50)
     
     # Check if API key is set
-    if TWELVEDATA_API_KEY in ["your_twelvedata_api_key", None, ""]:
-        logger.warning("⚠️ No Twelve Data API key configured!")
-        logger.warning("Set TWELVEDATA_API_KEY environment variable with your API key")
-        logger.warning("Get your free API key from: https://twelvedata.com/")
-        logger.info("Example:")
-        logger.info("   export TWELVEDATA_API_KEY=your_api_key_here")
-        logger.warning("Proceeding with mock data for testing...")
+    if TWELVEDATA_API_KEY is None:
+        _log_missing_api_key_hint()
     
     # Step 1: Load Excel tickers
     logger.info("📍 STEP 1/4: Loading stock tickers from Excel file")
@@ -435,8 +539,8 @@ def main():
     logger.info("=" * 50)
     logger.info("🎉 ALL STEPS COMPLETED SUCCESSFULLY!")
     logger.info("📊 Stock data has been updated in the Excel file")
-    if TWELVEDATA_API_KEY in ["your_twelvedata_api_key", None, ""]:
-        logger.info("💡 Note: Mock data was used. Configure API key for real data.")
+    if TWELVEDATA_API_KEY is None or _API_KEY_INVALID:
+        logger.info("💡 Note: Mock data was used. Configure a valid Twelve Data API key for real data.")
     logger.info("=" * 50)
 
 
