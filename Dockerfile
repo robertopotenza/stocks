@@ -1,72 +1,75 @@
-# Use Python 3.12 slim image for smaller footprint
-# Using Amazon ECR public registry to avoid Docker Hub authentication issues
-FROM public.ecr.aws/docker/library/python:3.12-slim
+# Multi-stage build for optimized stocks extractor with chromium
+# Stage 1: Build environment
+FROM public.ecr.aws/docker/library/python:3.12-slim AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Install system dependencies including Chrome and ChromeDriver
-RUN apt-get update && apt-get install -y \
+# Streamlined dependency installation in single layer with effective cleanup
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     gcc \
     ca-certificates \
     dnsutils \
     iputils-ping \
     curl \
     wget \
-    gnupg \
     unzip \
-    # Chrome dependencies
+    # Use chromium instead of full Chrome for smaller size
+    chromium \
+    chromium-driver \
+    # Essential chromium dependencies only
     fonts-liberation \
     libasound2 \
     libatk-bridge2.0-0 \
-    libatk1.0-0 \
-    libatspi2.0-0 \
     libdrm2 \
     libgtk-3-0 \
-    libnspr4 \
     libnss3 \
     libxcomposite1 \
     libxdamage1 \
     libxrandr2 \
-    xdg-utils \
-    libxss1 \
-    libu2f-udev \
-    libvulkan1 \
-    && rm -rf /var/lib/apt/lists/*
+    # Clean up apt caches in same layer to reduce size
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /var/log/* /tmp/* /var/tmp/* \
+    && apt-get autoremove -y --purge \
+    && apt-get clean
 
-# Install Google Chrome
-RUN wget -qO- https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor > /etc/apt/trusted.gpg.d/google.gpg \
-    && echo "deb [arch=amd64 signed-by=/etc/apt/trusted.gpg.d/google.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list \
-    && apt-get update \
-    && apt-get install -y google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install ChromeDriver using the new Chrome for Testing endpoints
-RUN CHROME_VERSION=$(google-chrome --version | cut -d ' ' -f3 | cut -d '.' -f1-3) \
-    && echo "Chrome version: ${CHROME_VERSION}" \
-    && CHROMEDRIVER_URL="https://googlechromelabs.github.io/chrome-for-testing/known-good-versions-with-downloads.json" \
-    && CHROMEDRIVER_VERSION=$(curl -s "${CHROMEDRIVER_URL}" | grep -o "\"version\":\"${CHROME_VERSION}[^\"]*" | head -1 | cut -d '"' -f4) \
-    && if [ -z "${CHROMEDRIVER_VERSION}" ]; then \
-        echo "No exact match found, using latest stable ChromeDriver" \
-        && CHROMEDRIVER_VERSION=$(curl -s "https://googlechromelabs.github.io/chrome-for-testing/LATEST_RELEASE_STABLE") \
-        && echo "Using ChromeDriver version: ${CHROMEDRIVER_VERSION}"; \
-       else \
-        echo "Using matched ChromeDriver version: ${CHROMEDRIVER_VERSION}"; \
-       fi \
-    && wget -O /tmp/chromedriver.zip "https://storage.googleapis.com/chrome-for-testing-public/${CHROMEDRIVER_VERSION}/linux64/chromedriver-linux64.zip" \
-    && unzip /tmp/chromedriver.zip -d /tmp/ \
-    && mv /tmp/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver \
-    && chmod +x /usr/local/bin/chromedriver \
-    && rm -rf /tmp/chromedriver.zip /tmp/chromedriver-linux64
-
-# Upgrade pip and setup certificates
-RUN pip install --upgrade pip
-
-# Copy requirements first for better Docker layer caching
+# Install Python dependencies
 COPY requirements.txt .
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org -r requirements.txt
 
-# Install Python dependencies with trusted hosts for SSL issues
-RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org -r requirements.txt
+# Stage 2: Minimal runtime environment
+FROM public.ecr.aws/docker/library/python:3.12-slim
+
+WORKDIR /app
+
+# Install only runtime dependencies with maximum cleanup
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    ca-certificates \
+    dnsutils \
+    iputils-ping \
+    curl \
+    # Chromium runtime essentials
+    chromium \
+    chromium-driver \
+    fonts-liberation \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libdrm2 \
+    libgtk-3-0 \
+    libnss3 \
+    libxcomposite1 \
+    libxdamage1 \
+    libxrandr2 \
+    # Aggressive cleanup in same layer for smaller image
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/* /var/log/* /tmp/* /var/tmp/* \
+    && apt-get autoremove -y --purge \
+    && apt-get clean \
+    # Remove unnecessary files to reduce size
+    && rm -rf /usr/share/doc/* /usr/share/man/* \
+    && find /usr -name "*.pyc" -delete
+
+# Copy Python packages from builder stage
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY . .
@@ -76,20 +79,22 @@ COPY . .
 # using docker-compose dns settings or --dns and --add-host flags
 # DO NOT modify /etc/resolv.conf or /etc/hosts in Docker build - they are read-only
 
-# Create a non-root user for security
-RUN useradd --create-home --shell /bin/bash app
-
-# Change ownership of the app directory to the app user
-RUN chown -R app:app /app
+# Create non-root user for security in single layer
+RUN useradd --create-home --shell /bin/bash app \
+    && chown -R app:app /app
 
 USER app
 
 # Download NLTK data including VADER lexicon for sentiment analysis as the app user
 RUN python -c "import nltk; nltk.download('vader_lexicon', quiet=True)"
 
-# Set environment variables for network configuration
-ENV DNS_SERVER=8.8.8.8
-ENV LOG_LEVEL=INFO
+# Set environment variables for network configuration and chromium
+ENV DNS_SERVER=8.8.8.8 \
+    LOG_LEVEL=INFO \
+    CHROME_BIN=/usr/bin/chromium \
+    CHROMEDRIVER_PATH=/usr/bin/chromedriver \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 # Run the application
 CMD ["python", "main.py"]
