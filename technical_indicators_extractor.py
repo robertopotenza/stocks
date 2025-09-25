@@ -23,13 +23,82 @@ import sys
 import time
 import socket
 import requests
+from collections import deque
 from datetime import datetime
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Deque, Dict, List, Any, Optional, Tuple
 import argparse
 from logging_config import get_logger
 
 # Get logger instance
 logger = get_logger('stocks_app.technical_indicators')
+
+
+class RateLimiter:
+    """Simple time-based rate limiter with cooldown support for API calls."""
+
+    def __init__(
+        self,
+        max_requests_per_minute: int = 8,
+        cooldown_seconds: float = 15.0
+    ) -> None:
+        if max_requests_per_minute <= 0:
+            raise ValueError("max_requests_per_minute must be greater than zero")
+
+        self.max_requests_per_minute = max_requests_per_minute
+        self.cooldown_seconds = max(0.0, cooldown_seconds)
+        self._timestamps: Deque[float] = deque()
+        self._cooldown_until: float = 0.0
+
+    def acquire(self) -> None:
+        """Block until a new request can be performed."""
+
+        now = time.time()
+
+        # Respect active cooldowns triggered by throttling responses
+        if self._cooldown_until and now < self._cooldown_until:
+            sleep_duration = self._cooldown_until - now
+            logger.debug(
+                "Cooldown active for %.2fs before next request", sleep_duration
+            )
+            time.sleep(sleep_duration)
+            now = time.time()
+
+        # Drop timestamps that are older than the rolling one-minute window
+        window = 60.0
+        while self._timestamps and now - self._timestamps[0] >= window:
+            self._timestamps.popleft()
+
+        if len(self._timestamps) >= self.max_requests_per_minute:
+            earliest = self._timestamps[0]
+            sleep_duration = window - (now - earliest)
+            if sleep_duration > 0:
+                logger.debug(
+                    "Rate limit reached (%s/min). Sleeping %.2fs",
+                    self.max_requests_per_minute,
+                    sleep_duration
+                )
+                time.sleep(sleep_duration)
+
+            # Clean up timestamps again after sleeping
+            now = time.time()
+            while self._timestamps and now - self._timestamps[0] >= window:
+                self._timestamps.popleft()
+
+        self._timestamps.append(time.time())
+
+    def trigger_cooldown(self, cooldown_override: Optional[float] = None) -> None:
+        """Apply a cooldown window when the API reports throttling."""
+
+        cooldown = self.cooldown_seconds if cooldown_override is None else cooldown_override
+        if cooldown <= 0:
+            return
+
+        until = time.time() + cooldown
+        if until > self._cooldown_until:
+            logger.warning(
+                "Applying Twelve Data cooldown for %.2fs due to throttling", cooldown
+            )
+            self._cooldown_until = until
 
 class TechnicalIndicatorsExtractor:
     """
@@ -43,22 +112,48 @@ class TechnicalIndicatorsExtractor:
         delay_max: float = 2.0,
         # Keep these parameters for backward compatibility
         headless: bool = True,
-        timeout: int = 30
+        timeout: int = 30,
+        requests_per_minute: Optional[int] = None,
+        cooldown_seconds: Optional[float] = None
     ):
         """
         Initialize the Technical Indicators Extractor.
-        
+
         Args:
             api_key: Twelve Data API key (if None, will try environment variable)
             delay_min: Minimum delay between API requests in seconds
             delay_max: Maximum delay between API requests in seconds
             headless: Kept for backward compatibility (not used)
             timeout: Kept for backward compatibility (not used)
+            requests_per_minute: Override requests per minute throttle (defaults to env/8)
+            cooldown_seconds: Override cooldown applied after throttling responses
         """
         self.api_key = api_key or os.getenv('TWELVEDATA_API_KEY') or os.getenv('api_key')
         self.delay_min = delay_min
         self.delay_max = delay_max
         self.base_url = "https://api.twelvedata.com"
+
+        self.requests_per_minute = self._load_rate_limit_setting(
+            'TWELVEDATA_REQUESTS_PER_MINUTE',
+            default=8,
+            cast=int,
+            override=requests_per_minute
+        )
+        self.cooldown_seconds = self._load_rate_limit_setting(
+            'TWELVEDATA_COOLDOWN_SECONDS',
+            default=15.0,
+            cast=float,
+            override=cooldown_seconds
+        )
+        self.rate_limiter = RateLimiter(
+            max_requests_per_minute=self.requests_per_minute,
+            cooldown_seconds=self.cooldown_seconds
+        )
+        logger.debug(
+            "Rate limiter configured for %s requests/minute with %.2fs cooldown",
+            self.requests_per_minute,
+            self.cooldown_seconds
+        )
         
         if not self.api_key or self.api_key == "your_twelvedata_api_key":
             logger.warning("No Twelve Data API key provided. Using mock data.")
@@ -66,6 +161,47 @@ class TechnicalIndicatorsExtractor:
         else:
             self.use_mock_data = False
             logger.info("Twelve Data API key configured successfully")
+
+    def _load_rate_limit_setting(
+        self,
+        env_var: str,
+        default: float,
+        cast,
+        override: Optional[float] = None
+    ):
+        """Load rate limit configuration from override or environment variable."""
+
+        if override is not None:
+            value = override
+            log_invalid = False
+        else:
+            value = os.getenv(env_var)
+            if value is None:
+                return default
+            log_invalid = True
+
+        try:
+            numeric_value = cast(value)
+        except (TypeError, ValueError):
+            if log_invalid:
+                logger.warning(
+                    "Invalid value for %s=%r. Falling back to default %s",
+                    env_var,
+                    value,
+                    default
+                )
+            return default
+
+        if numeric_value <= 0:
+            if log_invalid:
+                logger.warning(
+                    "Value for %s must be positive. Falling back to default %s",
+                    env_var,
+                    default
+                )
+            return default
+
+        return numeric_value
     
     def _random_delay(self):
         """Add random delay between requests to avoid rate limiting."""
@@ -108,18 +244,33 @@ class TechnicalIndicatorsExtractor:
         for attempt in range(max_retries):
             try:
                 logger.debug(f"API request attempt {attempt + 1}/{max_retries} to {endpoint}")
+                self.rate_limiter.acquire()
                 response = requests.get(url, params=params, timeout=30)
+
+                if response.status_code == 429:
+                    logger.warning(
+                        "Twelve Data rate limit reached (HTTP 429) on %s", endpoint
+                    )
+                    self.rate_limiter.trigger_cooldown()
+                    continue
+
                 response.raise_for_status()
-                
+
                 data = response.json()
-                
+
                 # Check for API error responses
                 if 'status' in data and data['status'] == 'error':
-                    logger.warning(f"API error for {endpoint}: {data.get('message', 'Unknown error')}")
+                    message = data.get('message', 'Unknown error')
+                    logger.warning(f"API error for {endpoint}: {message}")
+                    if 'code' in data and str(data['code']) == '429':
+                        self.rate_limiter.trigger_cooldown()
+                        continue
+                    if isinstance(message, str) and 'limit' in message.lower():
+                        self.rate_limiter.trigger_cooldown()
                     return None
-                    
+
                 return data
-                
+
             except requests.exceptions.ConnectionError as e:
                 logger.error(f"Connection error for {endpoint} (attempt {attempt + 1}/{max_retries}): {e}")
                 if "Failed to resolve" in str(e) or "Name or service not known" in str(e):
@@ -128,10 +279,17 @@ class TechnicalIndicatorsExtractor:
             except requests.exceptions.Timeout as e:
                 logger.warning(f"Timeout for {endpoint} (attempt {attempt + 1}/{max_retries}): {e}")
             except requests.exceptions.RequestException as e:
+                status = getattr(getattr(e, 'response', None), 'status_code', None)
+                if status == 429:
+                    logger.warning(
+                        f"API throttled request for {endpoint} (HTTP 429). Applying cooldown."
+                    )
+                    self.rate_limiter.trigger_cooldown()
+                    continue
                 logger.warning(f"API request failed for {endpoint} (attempt {attempt + 1}/{max_retries}): {e}")
             except Exception as e:
                 logger.warning(f"Unexpected error for {endpoint} (attempt {attempt + 1}/{max_retries}): {e}")
-            
+
             if attempt < max_retries - 1:
                 wait_time = (2 ** attempt)  # Exponential backoff: 1s, 2s, 4s
                 logger.info(f"Waiting {wait_time}s before retry...")
