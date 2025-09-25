@@ -14,5 +14,11 @@ ROBINHOOD_PASSWORD = "your_password"
 # Set as environment variable: export TWELVEDATA_API_KEY=your_api_key
 TWELVEDATA_API_KEY = "your_twelvedata_api_key"
 
+# Optional: Override Twelve Data rate limiting defaults (free tier: 8 req/min)
+# export TWELVEDATA_REQUESTS_PER_MINUTE=8
+# export TWELVEDATA_COOLDOWN_SECONDS=15
+# TWELVEDATA_REQUESTS_PER_MINUTE = 8
+# TWELVEDATA_COOLDOWN_SECONDS = 15
+
 # Path to Excel file containing tickers (must have 'Ticker' column)
 TICKERS_FILE = "tickers.xlsx"
