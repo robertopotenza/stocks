@@ -9,5 +9,10 @@
 ROBINHOOD_USERNAME = "your_email"
 ROBINHOOD_PASSWORD = "your_password"
 
+# Twelve Data API Key for technical indicators and current prices
+# Get your free API key from https://twelvedata.com/
+# Set as environment variable: export TWELVEDATA_API_KEY=your_api_key
+TWELVEDATA_API_KEY = "your_twelvedata_api_key"
+
 # Path to Excel file containing tickers (must have 'Ticker' column)
 TICKERS_FILE = "tickers.xlsx"

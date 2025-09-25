@@ -615,7 +615,7 @@ def get_combined_analysis():
 
 @app.route('/extract-technical-indicators')
 def extract_technical_indicators():
-    """Extract technical indicators for all tickers using web scraping."""
+    """Extract technical indicators for all tickers using Twelve Data API."""
     logger.debug("Technical indicators extraction endpoint accessed")
     
     try:
@@ -628,13 +628,12 @@ def extract_technical_indicators():
             }), 404
         
         # Get parameters
-        headless = request.args.get('headless', 'true').lower() == 'true'
-        timeout = min(int(request.args.get('timeout', '30')), 60)  # Max 60 seconds
+        api_key = request.args.get('api_key') or os.getenv('TWELVEDATA_API_KEY') or os.getenv('api_key')
         limit = request.args.get('limit', type=int)
         
-        logger.info(f"Starting technical indicators extraction (headless={headless}, timeout={timeout})")
+        logger.info(f"Starting technical indicators extraction using Twelve Data API")
         
-        # Load URL mappings
+        # Load URL mappings (only need Ticker column now)
         url_df = pd.read_excel(url_file)
         if limit and limit > 0:
             url_df = url_df.head(limit)
@@ -645,10 +644,9 @@ def extract_technical_indicators():
             url_df.to_excel(limited_file, index=False)
             url_file = limited_file
         
-        # Initialize extractor
+        # Initialize extractor with API key
         extractor = TechnicalIndicatorsExtractor(
-            headless=headless,
-            timeout=timeout,
+            api_key=api_key,
             delay_min=1.0,
             delay_max=2.0
         )
@@ -676,8 +674,9 @@ def extract_technical_indicators():
             if success:
                 return jsonify({
                     'status': 'completed',
-                    'message': f'Successfully extracted technical indicators for {len(url_df)} tickers',
-                    'processed_count': len(url_df)
+                    'message': f'Successfully extracted technical indicators for {len(url_df)} tickers using Twelve Data API',
+                    'processed_count': len(url_df),
+                    'data_source': 'Twelve Data API' if api_key else 'Mock Data (no API key)'
                 })
             else:
                 return jsonify({
@@ -692,7 +691,8 @@ def extract_technical_indicators():
             
             return jsonify({
                 'status': 'started',
-                'message': f'Technical indicators extraction started for {len(url_df)} tickers',
+                'message': f'Technical indicators extraction started for {len(url_df)} tickers using Twelve Data API',
+                'data_source': 'Twelve Data API' if api_key else 'Mock Data (no API key)',
                 'note': 'Check /status for progress updates'
             })
         

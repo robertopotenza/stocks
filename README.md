@@ -81,13 +81,13 @@ docker run --dns=8.8.8.8 --dns=1.1.1.1 \
 
 ### Method 1: Environment Variables (Recommended)
 ```bash
+# Twelve Data API for technical indicators and current prices (Required)
+export TWELVEDATA_API_KEY=your_twelvedata_api_key
+
+# Legacy Robinhood credentials (Optional - for basic stock data if Twelve Data is unavailable)
 export ROBINHOOD_USERNAME=your_email@example.com
 export ROBINHOOD_PASSWORD=your_password
 export ROBINHOOD_MFA=123456  # Optional: For non-interactive MFA (useful for deployment)
-
-# Investing.com credentials (Optional - for enhanced data access when using Selenium)
-export investing_login=your_investing_email@example.com
-export investing_password=your_investing_password
 
 # Social Media Sentiment Analysis (Optional - will use fallback if not provided)
 export REDDIT_CLIENT_ID=your_reddit_client_id
@@ -97,13 +97,13 @@ export TWITTER_BEARER_TOKEN=your_twitter_bearer_token
 ```
 
 **Note**: 
-- For Multi-Factor Authentication (MFA), you can either:
+- **TWELVEDATA_API_KEY** is the primary requirement for technical indicators and current stock prices
+  - Get your free API key from https://twelvedata.com/
+  - The free tier includes 800 API calls per day
+  - If not provided, the application will use mock data for testing
+- For Multi-Factor Authentication (MFA) with Robinhood, you can either:
   - Set `ROBINHOOD_MFA` environment variable for non-interactive mode (useful for headless deployments)
   - Leave it unset to be prompted interactively for the MFA code (only in interactive environments)
-- For Investing.com login:
-  - These credentials are **optional** and only used when Selenium is required for data extraction
-  - If not provided, the application will work normally without logging into Investing.com
-  - Login is attempted automatically when accessing Investing.com URLs via Selenium
 - In headless environments (Docker, Railway, CI), the application will automatically skip MFA prompts and proceed without MFA if the environment variable is not set
 
 ### Method 2: Configuration File
