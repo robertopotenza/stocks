@@ -1,11 +1,14 @@
 # Git files
 .git
 .gitignore
+.github
 
-# Documentation
+# Documentation (keep minimal docs needed for app)
 README.md
+*.md
+!TECHNICAL_INDICATORS.md
 
-# Python cache
+# Python cache and environments
 __pycache__
 *.pyc
 *.pyo
@@ -15,16 +18,22 @@ env
 .env
 venv
 .venv
+.tox
+.coverage
+htmlcov
+.pytest_cache
 
 # IDE files
 .vscode
 .idea
 *.swp
 *.swo
+.vim
 
 # OS files
 .DS_Store
 Thumbs.db
+.directory
 
 # Configuration files with credentials
 config.py
@@ -33,3 +42,22 @@ config.py
 build
 dist
 *.egg-info
+.eggs
+
+# Backup and temporary files
+*_backup_*.xlsx
+temp_*.xlsx
+*.tmp
+*.bak
+*.swp
+*.log
+logs/
+
+# Test files (keep main tickers.xlsx and URL.xlsx)
+sample_tickers.xlsx
+test_tickers.xlsx
+
+# Docker files not needed in build context
+docker-compose.yml
+Dockerfile.fixed
+Dockerfile

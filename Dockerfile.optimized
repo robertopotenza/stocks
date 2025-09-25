@@ -1,48 +1,65 @@
-# Fast Docker Build Optimization
-# This optimized Dockerfile reduces build time from 2+ minutes to under 1 minute
-# Uses Python 3.12 slim image for smaller footprint and faster builds
-FROM public.ecr.aws/docker/library/python:3.12-slim
+# Multi-stage optimized Docker build for minimal size and fast deployment
+# Stage 1: Build dependencies
+FROM public.ecr.aws/docker/library/python:3.12-slim AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Install minimal system dependencies for faster builds
+# Install build dependencies in a single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
-    ca-certificates \
-    dnsutils \
-    iputils-ping \
-    curl \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Upgrade pip with faster settings
-RUN pip install --upgrade pip --root-user-action=ignore --no-cache-dir
-
-# Copy requirements first for better Docker layer caching
+# Install pip and requirements
 COPY requirements.txt .
-
-# Install Python dependencies with optimizations
-RUN pip install --no-cache-dir --root-user-action=ignore \
+RUN pip install --upgrade pip --root-user-action=ignore --no-cache-dir \
+    && pip install --no-cache-dir --root-user-action=ignore \
     --trusted-host pypi.org \
     --trusted-host pypi.python.org \
     --trusted-host files.pythonhosted.org \
     --disable-pip-version-check \
     -r requirements.txt
 
-# Copy application code
-COPY . .
+# Stage 2: Minimal runtime image
+FROM public.ecr.aws/docker/library/python:3.12-slim
 
-# Create a non-root user for security
-RUN useradd --create-home --shell /bin/bash app && \
-    chown -R app:app /app
+WORKDIR /app
+
+# Install only essential runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    dnsutils \
+    iputils-ping \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean \
+    && rm -rf /usr/share/doc/* /usr/share/man/* /var/cache/apt/*
+
+# Copy Python packages from builder stage
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
+
+# Copy essential application files (specific files to avoid copying unnecessary ones)
+COPY main.py build_optimize.py logging_config.py ./
+COPY sentiment_analysis.py stock_prices.py combined_analysis.py ./
+COPY web_server.py wsgi.py ai_evaluation.py ./
+COPY technical_analysis.py technical_indicators_extractor.py ./
+COPY requirements.txt tickers.xlsx URL.xlsx ./
+COPY static/ static/
+COPY templates/ templates/
+
+# Create non-root user and setup permissions in single layer
+RUN useradd --create-home --shell /bin/bash app \
+    && chown -R app:app /app \
+    && find /app -type f -name "*.py" -exec chmod 644 {} \; \
+    && chmod 755 /app/main.py /app/build_optimize.py
 
 USER app
 
-# Download NLTK data with SSL fix and fallback
+# Download NLTK data with optimized script
 RUN python build_optimize.py
 
-# Set environment variables for network configuration and performance
+# Set optimized environment variables
 ENV DNS_SERVER=8.8.8.8 \
     LOG_LEVEL=INFO \
     PYTHONUNBUFFERED=1 \
