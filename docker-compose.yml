@@ -2,7 +2,7 @@ services:
   stocks-app:
     build: 
       context: .
-      dockerfile: Dockerfile.fixed
+      dockerfile: Dockerfile.optimized
     container_name: stocks-extractor
     
     # Network configuration for DNS resolution
@@ -50,7 +50,7 @@ services:
   stocks-debug:
     build: 
       context: .
-      dockerfile: Dockerfile.fixed
+      dockerfile: Dockerfile.optimized
     container_name: stocks-debug
     command: ["python", "production_debug.py", "--full-test"]
     

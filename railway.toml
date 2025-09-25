@@ -1,5 +1,6 @@
 [build]
 builder = "dockerfile"
+dockerfilePath = "Dockerfile.optimized"
 
 [deploy]
 startCommand = "python main.py"

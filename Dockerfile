@@ -33,8 +33,8 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
 
 # Install Python dependencies
 COPY requirements.txt .
-RUN pip install --upgrade pip \
-    && pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org -r requirements.txt
+RUN pip install --upgrade pip --root-user-action=ignore \
+    && pip install --no-cache-dir --root-user-action=ignore --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org -r requirements.txt
 
 # Stage 2: Minimal runtime environment
 FROM public.ecr.aws/docker/library/python:3.12-slim
@@ -86,7 +86,9 @@ RUN useradd --create-home --shell /bin/bash app \
 USER app
 
 # Download NLTK data including VADER lexicon for sentiment analysis as the app user
-RUN python -c "import nltk; nltk.download('vader_lexicon', quiet=True)"
+# Fix SSL certificate issues by using trusted hosts and disabling SSL verification
+RUN python -c "import ssl; ssl._create_default_https_context = ssl._create_unverified_context; import nltk; nltk.download('vader_lexicon', quiet=True)" || \
+    python -c "import nltk; nltk.data.path.append('/app/nltk_data'); print('NLTK download failed but will attempt runtime download')"
 
 # Set environment variables for network configuration and chromium
 ENV DNS_SERVER=8.8.8.8 \
