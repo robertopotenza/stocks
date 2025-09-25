@@ -647,28 +647,36 @@ class TechnicalIndicatorsExtractor:
                         logger.error("Rate limit exceeded on all attempts")
                         return None
                         
+                elif response.status_code == 404:
+                    logger.warning(f"🔍 URL Not Found (404) for {url}")
+                    logger.warning("This may indicate:")
+                    logger.warning("  1. Outdated URL in the mapping file")
+                    logger.warning("  2. Stock symbol or page structure changed")
+                    logger.warning("  3. Website maintenance or temporary unavailability")
+                    # Don't retry 404s - they won't get better with retries
+                    return None
+                    
                 else:
-                    logger.warning(f"HTTP error {response.status_code} for {url}")
+                    logger.warning(f"⚠️ HTTP error {response.status_code} for {url}")
                     if attempt < max_retries - 1:
                         continue
                     return None
                     
             except requests.exceptions.ConnectionError as e:
-                # Enhanced DNS/connection error reporting
+                # Enhanced DNS/connection error reporting with better classification
                 error_str = str(e)
                 if "Failed to resolve" in error_str or "Name or service not known" in error_str:
-                    logger.error(f"DNS Resolution Failed for {url}: {e}")
-                    logger.error("Possible causes: DNS server misconfiguration, network restrictions, or firewall blocking")
-                    logger.error("Suggested fixes:")
-                    logger.error("  1. Add to /etc/hosts: echo '5.254.205.57 www.investing.com investing.com' >> /etc/hosts")
-                    logger.error("  2. Configure DNS: export DNS_SERVER=8.8.8.8")
-                    logger.error("  3. Check proxy settings: export HTTPS_PROXY=http://proxy:port")
+                    logger.warning(f"⚠️ DNS Resolution Failed for {url}: {e}")
+                    logger.warning("This indicates network connectivity issues, not necessarily a production bug")
+                    logger.info("Network troubleshooting steps:")
+                    logger.info("  1. Check internet connectivity")
+                    logger.info("  2. Verify DNS resolution: nslookup www.investing.com")
+                    logger.info("  3. Test direct connection: curl -I https://www.investing.com")
                 else:
-                    logger.error(f"Connection error for {url}: {e}")
+                    logger.warning(f"⚠️ Connection error for {url}: {e}")
                     
-                if attempt < max_retries - 1:
-                    logger.info(f"Retrying connection in attempt {attempt + 2}")
-                    continue
+                # Don't retry connection errors - they're likely environmental
+                logger.info("Skipping retries for connection errors - likely environment/network issue")
                 return None
                 
             except requests.exceptions.Timeout as e:
@@ -987,6 +995,39 @@ class TechnicalIndicatorsExtractor:
         
         return indicators
     
+    def _classify_failure_reason(self, url: str) -> str:
+        """
+        Classify the reason for extraction failure to provide better error messages.
+        
+        Args:
+            url: The URL that failed
+            
+        Returns:
+            Failure classification: "network", "url", "selenium", or "unknown"
+        """
+        try:
+            # Quick connection test to determine if it's a network issue
+            import socket
+            from urllib.parse import urlparse
+            
+            parsed_url = urlparse(url)
+            host = parsed_url.netloc
+            
+            # Test basic DNS resolution
+            try:
+                socket.gethostbyname(host)
+                # If we can resolve DNS, it's likely a URL/server issue
+                return "url"
+            except socket.gaierror:
+                # Can't resolve DNS, it's a network issue
+                return "network"
+                
+        except Exception:
+            # Test if selenium is available
+            if not self.enable_selenium:
+                return "selenium"
+            return "unknown"
+
     def _generate_mock_indicators(self, ticker: str) -> Dict[str, Any]:
         """
         Generate mock technical indicators for testing when network is unavailable.
@@ -1064,6 +1105,35 @@ class TechnicalIndicatorsExtractor:
         except Exception as e:
             logger.debug(f"Failed to extract pivot points from table structure: {e}")
     
+    def _validate_url(self, url: str) -> bool:
+        """
+        Basic URL validation to catch obvious issues early.
+        
+        Args:
+            url: URL to validate
+            
+        Returns:
+            True if URL appears valid, False otherwise
+        """
+        try:
+            from urllib.parse import urlparse
+            parsed = urlparse(url)
+            
+            # Check if URL has required components
+            if not all([parsed.scheme, parsed.netloc]):
+                logger.warning(f"Invalid URL format: {url}")
+                return False
+                
+            # Check for common URL patterns that might be problematic
+            if parsed.netloc not in ['www.investing.com', 'investing.com']:
+                logger.debug(f"Non-investing.com URL detected: {url}")
+                
+            return True
+            
+        except Exception as e:
+            logger.warning(f"URL validation error for {url}: {e}")
+            return False
+
     def extract_indicators_for_ticker(self, ticker: str, url: str) -> Dict[str, Any]:
         """
         Extract technical indicators for a single ticker.
@@ -1084,6 +1154,15 @@ class TechnicalIndicatorsExtractor:
             'data_quality': 'fallback',
             'notes': ''
         }
+        
+        # Validate URL first
+        if not self._validate_url(url):
+            logger.warning(f"Invalid URL for {ticker}: {url}")
+            result['data_quality'] = 'mock'
+            result['notes'] = 'Mock data - Invalid URL format'
+            indicators = self._generate_mock_indicators(ticker)
+            result.update(indicators)
+            return result
         
         # Add random delay
         self._random_delay()
@@ -1117,18 +1196,30 @@ class TechnicalIndicatorsExtractor:
                     result['data_quality'] = 'partial'
                 result['notes'] = 'Used Selenium fallback'
             else:
-                # Network failure - use mock data for testing
-                logger.info(f"❌ Selenium method failed for {ticker}, falling back to mock data")
-                logger.warning(f"Network unavailable for {ticker}, using mock data for testing")
-                logger.warning("This indicates a production issue that needs immediate attention:")
-                logger.warning("  1. DNS resolution failure for investing.com")
-                logger.warning("  2. Network connectivity problems")
-                logger.warning("  3. Firewall or proxy configuration issues")
-                logger.warning("Run 'python production_debug.py' for detailed diagnosis")
+                # Both HTTP and Selenium methods failed - determine reason and provide appropriate fallback
+                logger.info(f"❌ Both HTTP and Selenium methods failed for {ticker}")
+                
+                # Classify the failure reason for better error messages
+                failure_reason = self._classify_failure_reason(url)
+                
+                if failure_reason == "network":
+                    logger.warning(f"Network connectivity issue for {ticker}, using mock data for testing")
+                    logger.warning("This indicates network/connectivity problems - check internet connection")
+                    result['notes'] = 'Mock data - Network connectivity issue. Check internet connection.'
+                elif failure_reason == "url":
+                    logger.warning(f"URL appears invalid/outdated for {ticker}, using mock data")
+                    logger.warning("Consider updating the URL mapping in the Excel file")
+                    result['notes'] = 'Mock data - URL may be outdated. Check URL mapping file.'
+                elif failure_reason == "selenium":
+                    logger.warning(f"Selenium WebDriver unavailable for {ticker}, using mock data")
+                    logger.warning("Chrome WebDriver not available in this environment")
+                    result['notes'] = 'Mock data - WebDriver unavailable. HTTP method also failed.'
+                else:
+                    logger.warning(f"Unknown failure for {ticker}, using mock data")
+                    result['notes'] = 'Mock data - Multiple extraction methods failed.'
                 
                 indicators = self._generate_mock_indicators(ticker)
                 result['data_quality'] = 'mock'
-                result['notes'] = 'Mock data - PRODUCTION ISSUE: Network/DNS failure. Run production_debug.py for fixes.'
         
         # Merge indicators into result
         result.update(indicators)
