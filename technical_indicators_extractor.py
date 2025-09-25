@@ -22,6 +22,9 @@ import sys
 import re
 import time
 import random
+import socket
+import subprocess
+import signal
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
 import requests
@@ -86,6 +89,9 @@ class TechnicalIndicatorsExtractor:
         # Header profiles for rotation to avoid detection
         self.header_profiles = self._get_header_profiles()
         
+        # Cache network connectivity status
+        self._network_available = None
+        self._network_check_time = None
     def _setup_requests_session(self) -> requests.Session:
         """Set up requests session with retry strategy and proxy support."""
         session = requests.Session()
@@ -183,6 +189,139 @@ class TechnicalIndicatorsExtractor:
         
         logger.debug(f"Using header profile {self.current_header_profile} with User-Agent: {headers['User-Agent']}")
         return headers
+
+    def _check_network_connectivity(self, force_recheck: bool = False) -> bool:
+        """
+        Check if network connectivity is available.
+        
+        Args:
+            force_recheck: Force a new check even if cached result exists
+            
+        Returns:
+            True if network is available, False otherwise
+        """
+        # Use cached result if available and recent (within 5 minutes)
+        if not force_recheck and self._network_available is not None and self._network_check_time:
+            time_since_check = time.time() - self._network_check_time
+            if time_since_check < 300:  # 5 minutes
+                return self._network_available
+        
+        logger.debug("Checking network connectivity...")
+        
+        # Test multiple connectivity methods quickly
+        connectivity_tests = [
+            self._test_dns_resolution,
+            self._test_basic_connectivity,
+            self._test_http_connectivity
+        ]
+        
+        for test_func in connectivity_tests:
+            try:
+                if test_func():
+                    logger.debug("✅ Network connectivity confirmed")
+                    self._network_available = True
+                    self._network_check_time = time.time()
+                    return True
+            except Exception as e:
+                logger.debug(f"Network test failed: {e}")
+                continue
+        
+        logger.info("❌ No network connectivity detected")
+        logger.info("🔍 This may be a sandboxed environment - will use offline fallback methods")
+        self._network_available = False
+        self._network_check_time = time.time()
+        return False
+    
+    def _test_dns_resolution(self) -> bool:
+        """Test DNS resolution quickly."""
+        try:
+            socket.setdefaulttimeout(3)  # 3 second timeout
+            socket.gethostbyname('www.google.com')
+            return True
+        except (socket.gaierror, socket.timeout):
+            return False
+        finally:
+            socket.setdefaulttimeout(None)
+    
+    def _test_basic_connectivity(self) -> bool:
+        """Test basic network connectivity."""
+        try:
+            # Try to connect to Google's DNS
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(3)
+            result = sock.connect_ex(('8.8.8.8', 53))
+            sock.close()
+            return result == 0
+        except Exception:
+            return False
+    
+    def _test_http_connectivity(self) -> bool:
+        """Test HTTP connectivity with minimal request."""
+        try:
+            import urllib.request
+            urllib.request.urlopen('http://www.google.com', timeout=3)
+            return True
+        except Exception:
+            return False
+
+    def _create_driver_with_timeout(self, options: Options, timeout: int = 15) -> Optional[webdriver.Chrome]:
+        """
+        Create Chrome WebDriver with timeout to prevent hanging.
+        
+        Args:
+            options: Chrome options
+            timeout: Timeout in seconds for driver creation
+            
+        Returns:
+            WebDriver instance or None if failed/timed out
+        """
+        def timeout_handler(signum, frame):
+            raise TimeoutError("WebDriver initialization timed out")
+        
+        # Set up timeout signal (Unix/Linux only)
+        if hasattr(signal, 'SIGALRM'):
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(timeout)
+        
+        try:
+            # First try: default ChromeDriver
+            try:
+                driver = webdriver.Chrome(options=options)
+                logger.info("✅ Chrome WebDriver initialized successfully")
+                return driver
+            except Exception as e1:
+                logger.debug(f"Default ChromeDriver failed: {e1}")
+                
+                # Second try: undetected-chromedriver if available
+                try:
+                    import undetected_chromedriver as uc
+                    driver = uc.Chrome(
+                        options=options,
+                        headless=self.headless,
+                        version_main=None  # Auto-detect version
+                    )
+                    logger.info("✅ Undetected Chrome WebDriver initialized successfully")
+                    return driver
+                    
+                except ImportError:
+                    logger.debug("undetected-chromedriver not available")
+                except Exception as e2:
+                    logger.debug(f"Undetected ChromeDriver failed: {e2}")
+            
+            return None
+            
+        except TimeoutError:
+            logger.error(f"❌ WebDriver initialization timed out after {timeout} seconds")
+            logger.info("💡 This usually indicates network connectivity issues in sandboxed environments")
+            return None
+        except Exception as e:
+            logger.error(f"❌ WebDriver initialization failed: {e}")
+            return None
+        finally:
+            # Clear timeout signal
+            if hasattr(signal, 'SIGALRM'):
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
     
     def _setup_selenium_driver(self) -> Optional[webdriver.Chrome]:
         """Set up Selenium Chrome driver with enhanced options for container environments."""
@@ -273,31 +412,17 @@ class TechnicalIndicatorsExtractor:
             else:
                 logger.warning("No Chrome binary found, relying on default PATH")
             
-            # Try to create driver with different approaches
-            driver = None
+            # Check network connectivity first
+            network_available = self._check_network_connectivity()
+            if not network_available:
+                logger.warning("⚠️  No network connectivity detected")
+                logger.info("🚫 Skipping Selenium WebDriver initialization in offline environment")
+                logger.info("💡 WebDriver requires network access and will hang without it")
+                return None
             
-            # First try: default ChromeDriver
-            try:
-                driver = webdriver.Chrome(options=options)
-                logger.info("✅ Chrome WebDriver initialized successfully")
-            
-            except Exception as e1:
-                logger.debug(f"Default ChromeDriver failed: {e1}")
-                
-                # Second try: undetected-chromedriver if available
-                try:
-                    import undetected_chromedriver as uc
-                    driver = uc.Chrome(
-                        options=options,
-                        headless=self.headless,
-                        version_main=None  # Auto-detect version
-                    )
-                    logger.info("✅ Undetected Chrome WebDriver initialized successfully")
-                    
-                except ImportError:
-                    logger.debug("undetected-chromedriver not available")
-                except Exception as e2:
-                    logger.debug(f"Undetected ChromeDriver failed: {e2}")
+            # Try to create driver with timeout protection
+            logger.debug("Creating Chrome WebDriver with timeout protection...")
+            driver = self._create_driver_with_timeout(options, timeout=15)
             
             if driver:
                 # Configure timeouts with container-friendly values
@@ -322,7 +447,11 @@ class TechnicalIndicatorsExtractor:
                 
                 return driver
             else:
-                logger.error("❌ Failed to initialize any Chrome WebDriver")
+                logger.error("❌ Failed to initialize Chrome WebDriver")
+                logger.info("💡 This may be due to:")
+                logger.info("   - Network connectivity issues in sandboxed environment")
+                logger.info("   - Missing Chrome/ChromeDriver dependencies")
+                logger.info("   - Incompatible Chrome/ChromeDriver versions")
                 return None
                 
         except ImportError as e:
@@ -597,6 +726,13 @@ class TechnicalIndicatorsExtractor:
         if url in self.page_cache:
             logger.debug(f"Using cached content for {url}")
             return self.page_cache[url]
+        
+        # Quick network connectivity check for first URL
+        if not hasattr(self, '_network_checked') or not self._network_checked:
+            if not self._check_network_connectivity():
+                logger.info("🚫 No network connectivity - HTTP requests will likely fail")
+                # Don't return None immediately, let it try and fail naturally with better error messages
+            self._network_checked = True
             
         max_retries = 3
         for attempt in range(max_retries):
@@ -705,7 +841,12 @@ class TechnicalIndicatorsExtractor:
         Returns:
             BeautifulSoup object or None if failed
         """
-        # Skip Selenium if no network access or driver unavailable  
+        # Check network connectivity first
+        if not self._check_network_connectivity():
+            logger.info("🚫 No network connectivity - skipping Selenium method")
+            return None
+            
+        # Skip Selenium if driver unavailable  
         if not self.driver:
             self.driver = self._setup_selenium_driver()
             if not self.driver:
