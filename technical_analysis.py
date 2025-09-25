@@ -43,6 +43,9 @@ def get_historical_data(ticker: str, interval: str = 'day', span: str = '3month'
         # Filter out None values and convert price strings to floats
         clean_data = []
         for data_point in historical_data:
+            if not isinstance(data_point, dict):
+                continue
+
             if all(data_point.get(key) is not None for key in ['open_price', 'high_price', 'low_price', 'close_price']):
                 try:
                     clean_point = {
