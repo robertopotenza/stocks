@@ -200,7 +200,7 @@ class TechnicalIndicatorsExtractor:
             if self.headless:
                 options.add_argument('--headless=new')  # Use new headless mode
             
-            # Security and stability options for containers
+            # Enhanced container stability options
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--disable-gpu')
@@ -210,6 +210,23 @@ class TechnicalIndicatorsExtractor:
             options.add_argument('--disable-renderer-backgrounding')
             options.add_argument('--disable-features=TranslateUI')
             options.add_argument('--disable-ipc-flooding-protection')
+            
+            # Additional container-specific stability options
+            options.add_argument('--memory-pressure-off')
+            options.add_argument('--max_old_space_size=4096')
+            options.add_argument('--single-process')  # Use single process mode for better resource management
+            options.add_argument('--disable-background-networking')
+            options.add_argument('--disable-default-apps')
+            options.add_argument('--disable-sync')
+            options.add_argument('--disable-translate')
+            options.add_argument('--hide-scrollbars')
+            options.add_argument('--metrics-recording-only')
+            options.add_argument('--mute-audio')
+            options.add_argument('--no-first-run')
+            options.add_argument('--safebrowsing-disable-auto-update')
+            options.add_argument('--disable-logging')
+            options.add_argument('--disable-web-security')
+            options.add_argument('--allow-running-insecure-content')
             
             # Window size and display options
             options.add_argument('--window-size=1920,1080')
@@ -283,9 +300,12 @@ class TechnicalIndicatorsExtractor:
                     logger.debug(f"Undetected ChromeDriver failed: {e2}")
             
             if driver:
-                # Configure timeouts
-                driver.set_page_load_timeout(self.timeout)
-                driver.implicitly_wait(10)
+                # Configure timeouts with container-friendly values
+                driver.set_page_load_timeout(max(self.timeout, 60))  # Minimum 60 seconds for containers
+                driver.implicitly_wait(15)  # Increased implicit wait for slower containers
+                
+                # Set script timeout for heavy JS pages
+                driver.set_script_timeout(30)
                 
                 # Execute script to hide automation indicators
                 try:
@@ -293,7 +313,13 @@ class TechnicalIndicatorsExtractor:
                 except Exception:
                     pass  # Ignore if script execution fails
                 
-                logger.debug("Selenium driver configured successfully")
+                # Test driver responsiveness
+                try:
+                    driver.execute_script("return document.readyState;")
+                    logger.debug("Selenium driver configured and responsive")
+                except Exception as e:
+                    logger.warning(f"Driver responsiveness test failed: {e}")
+                
                 return driver
             else:
                 logger.error("❌ Failed to initialize any Chrome WebDriver")
@@ -306,9 +332,58 @@ class TechnicalIndicatorsExtractor:
             logger.error(f"Failed to setup Selenium driver: {e}")
             return None
     
+    def _check_chrome_health(self, driver: webdriver.Chrome) -> bool:
+        """Check if Chrome driver is healthy and responsive."""
+        try:
+            # Basic responsiveness test
+            driver.execute_script("return document.readyState;")
+            
+            # Check if we can navigate
+            current_url = driver.current_url
+            if not current_url or current_url == "data:,":
+                return False
+                
+            return True
+        except Exception as e:
+            logger.debug(f"Chrome health check failed: {e}")
+            return False
+    
+    def _get_chrome_version_info(self) -> Dict[str, str]:
+        """Get Chrome and ChromeDriver version information for debugging."""
+        info = {"chrome_version": "unknown", "chromedriver_version": "unknown"}
+        
+        try:
+            # Try to get Chrome version
+            import subprocess
+            result = subprocess.run(
+                ["google-chrome", "--version"], 
+                capture_output=True, 
+                text=True, 
+                timeout=5
+            )
+            if result.returncode == 0:
+                info["chrome_version"] = result.stdout.strip()
+        except Exception:
+            pass
+            
+        try:
+            # Try to get ChromeDriver version
+            result = subprocess.run(
+                ["chromedriver", "--version"], 
+                capture_output=True, 
+                text=True, 
+                timeout=5
+            )
+            if result.returncode == 0:
+                info["chromedriver_version"] = result.stdout.strip()
+        except Exception:
+            pass
+            
+        return info
+    
     def _login_to_investing_com(self) -> bool:
         """
-        Attempt to log into investing.com using Selenium driver.
+        Attempt to log into investing.com using Selenium driver with progressive timeout handling.
         
         Returns:
             bool: True if login successful or no credentials provided, False if login failed
@@ -326,81 +401,175 @@ class TechnicalIndicatorsExtractor:
             logger.warning("No Selenium driver available for Investing.com login")
             return False
             
-        try:
-            logger.info("🔐 Attempting to log into Investing.com...")
+        # Log version information for debugging
+        version_info = self._get_chrome_version_info()
+        logger.debug(f"Chrome: {version_info['chrome_version']}, ChromeDriver: {version_info['chromedriver_version']}")
+        
+        # Progressive timeout strategy - try with increasing timeouts
+        timeout_attempts = [15, 30, 45]  # Progressive timeouts for container environments
+        
+        for attempt, timeout in enumerate(timeout_attempts, 1):
+            logger.info(f"🔐 Attempting to log into Investing.com (attempt {attempt}/{len(timeout_attempts)}, timeout: {timeout}s)...")
             
-            # Navigate to login page
-            login_url = "https://www.investing.com/members-admin/auth/signIn/"
-            self.driver.get(login_url)
-            
-            # Wait for login form to be present
-            WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.ID, "loginFormUser_email"))
-            )
-            
-            # Find and fill login form
-            email_field = self.driver.find_element(By.ID, "loginFormUser_email")
-            password_field = self.driver.find_element(By.ID, "loginFormUser_password")
-            
-            # Clear fields and enter credentials
-            email_field.clear()
-            email_field.send_keys(self.investing_login)
-            
-            password_field.clear()
-            password_field.send_keys(self.investing_password)
-            
-            # Find and click login button
-            login_button = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']")
-            login_button.click()
-            
-            # Wait for login to complete - check for successful redirect or user menu
             try:
-                # Wait for either success indicators or error messages
-                WebDriverWait(self.driver, 15).until(
-                    lambda driver: (
-                        # Success indicators
-                        driver.find_elements(By.CSS_SELECTOR, ".userMenu, .user-menu, [data-test='user-menu']") or
-                        driver.current_url != login_url or
-                        # Error indicators
-                        driver.find_elements(By.CSS_SELECTOR, ".error, .alert-danger, .errorMessage")
+                # Check driver health before attempting login
+                if not self._check_chrome_health(self.driver):
+                    logger.warning("Chrome driver appears unhealthy, attempting recovery...")
+                    # Try to recreate driver if unhealthy
+                    if attempt == 1:  # Only try recreation on first attempt
+                        try:
+                            self.driver.quit()
+                        except:
+                            pass
+                        self.driver = self._setup_selenium_driver()
+                        if not self.driver:
+                            logger.error("Failed to recreate Selenium driver")
+                            continue
+                
+                # Navigate to login page with timeout
+                login_url = "https://www.investing.com/members-admin/auth/signIn/"
+                
+                try:
+                    self.driver.get(login_url)
+                except TimeoutException:
+                    logger.warning(f"Page load timeout on attempt {attempt}, trying with longer timeout...")
+                    if attempt < len(timeout_attempts):
+                        continue
+                    else:
+                        logger.warning("All page load attempts failed, proceeding anyway")
+                        return True
+                
+                # Wait for login form to be present with progressive timeout
+                try:
+                    WebDriverWait(self.driver, timeout).until(
+                        EC.presence_of_element_located((By.ID, "loginFormUser_email"))
                     )
-                )
+                except TimeoutException as e:
+                    logger.warning(f"Login form not found within {timeout}s on attempt {attempt}")
+                    if attempt < len(timeout_attempts):
+                        continue
+                    else:
+                        logger.warning("Login form never appeared - page structure may have changed")
+                        return True
                 
-                # Check for error messages
-                error_elements = self.driver.find_elements(By.CSS_SELECTOR, ".error, .alert-danger, .errorMessage")
-                if error_elements:
-                    error_text = error_elements[0].text.strip()
-                    logger.error(f"❌ Investing.com login failed: {error_text}")
-                    return False
+                # Find and fill login form
+                try:
+                    email_field = self.driver.find_element(By.ID, "loginFormUser_email")
+                    password_field = self.driver.find_element(By.ID, "loginFormUser_password")
+                    
+                    # Clear fields and enter credentials
+                    email_field.clear()
+                    time.sleep(0.5)  # Small delay for form stability
+                    email_field.send_keys(self.investing_login)
+                    
+                    password_field.clear()
+                    time.sleep(0.5)
+                    password_field.send_keys(self.investing_password)
+                    
+                    # Find and click login button
+                    login_button = self.driver.find_element(By.CSS_SELECTOR, "button[type='submit'], input[type='submit']")
+                    login_button.click()
+                    
+                except NoSuchElementException as e:
+                    logger.warning(f"Login form elements not found on attempt {attempt}: {e}")
+                    if attempt < len(timeout_attempts):
+                        continue
+                    else:
+                        logger.warning("Login form elements not found - page structure may have changed")
+                        return True
                 
-                # Check for successful login indicators
-                success_indicators = self.driver.find_elements(By.CSS_SELECTOR, ".userMenu, .user-menu, [data-test='user-menu'], .user_name")
-                if success_indicators or self.driver.current_url != login_url:
-                    logger.info("✅ Successfully logged into Investing.com")
-                    self.investing_logged_in = True
-                    return True
+                # Wait for login to complete with progressive timeout
+                try:
+                    WebDriverWait(self.driver, timeout).until(
+                        lambda driver: (
+                            # Success indicators
+                            driver.find_elements(By.CSS_SELECTOR, ".userMenu, .user-menu, [data-test='user-menu']") or
+                            driver.current_url != login_url or
+                            # Error indicators
+                            driver.find_elements(By.CSS_SELECTOR, ".error, .alert-danger, .errorMessage")
+                        )
+                    )
+                    
+                    # Check for error messages
+                    error_elements = self.driver.find_elements(By.CSS_SELECTOR, ".error, .alert-danger, .errorMessage")
+                    if error_elements:
+                        error_text = error_elements[0].text.strip()
+                        logger.error(f"❌ Investing.com login failed: {error_text}")
+                        return False
+                    
+                    # Check for successful login indicators
+                    success_indicators = self.driver.find_elements(By.CSS_SELECTOR, ".userMenu, .user-menu, [data-test='user-menu'], .user_name")
+                    if success_indicators or self.driver.current_url != login_url:
+                        logger.info("✅ Successfully logged into Investing.com")
+                        self.investing_logged_in = True
+                        return True
+                    else:
+                        logger.warning("⚠️ Investing.com login status unclear - proceeding anyway")
+                        return True
+                        
+                except TimeoutException:
+                    logger.warning(f"⏱️ Investing.com login timeout ({timeout}s) on attempt {attempt}")
+                    if attempt < len(timeout_attempts):
+                        continue
+                    else:
+                        logger.warning("All login attempts timed out - may have succeeded, proceeding anyway")
+                        return True
+                
+            except WebDriverException as e:
+                logger.warning(f"WebDriver error on login attempt {attempt}: {e}")
+                if "chrome not reachable" in str(e).lower() or "session deleted" in str(e).lower():
+                    logger.warning("Chrome process appears to have crashed, attempting to recreate driver...")
+                    try:
+                        self.driver.quit()
+                    except:
+                        pass
+                    self.driver = self._setup_selenium_driver()
+                    if not self.driver:
+                        logger.error("Failed to recreate Selenium driver after crash")
+                        return False
+                
+                if attempt < len(timeout_attempts):
+                    continue
                 else:
-                    logger.warning("⚠️ Investing.com login status unclear - proceeding anyway")
+                    logger.warning("All WebDriver attempts failed - proceeding without login")
                     return True
                     
-            except TimeoutException:
-                logger.warning("⏱️ Investing.com login timeout - may have succeeded, proceeding anyway")
-                return True
-                
-        except NoSuchElementException as e:
-            logger.warning(f"⚠️ Investing.com login form elements not found: {e}")
-            logger.warning("Login page structure may have changed - proceeding without login")
+            except Exception as e:
+                logger.warning(f"⚠️ Unexpected error during Investing.com login attempt {attempt}: {e}")
+                if attempt < len(timeout_attempts):
+                    continue
+                else:
+                    logger.warning("All login attempts failed - proceeding without login")
+                    return True
+        
+        # If we get here, all attempts failed
+        logger.warning("All Investing.com login attempts exhausted - proceeding without login")
+        return True
+    
+    def _recover_selenium_driver(self) -> bool:
+        """Attempt to recover a failed Selenium driver."""
+        logger.info("🔄 Attempting to recover Selenium driver...")
+        
+        # Clean up existing driver
+        if self.driver:
+            try:
+                self.driver.quit()
+            except Exception as e:
+                logger.debug(f"Error during driver cleanup: {e}")
+            self.driver = None
+        
+        # Reset login state
+        self.investing_logged_in = False
+        
+        # Try to create new driver
+        self.driver = self._setup_selenium_driver()
+        
+        if self.driver:
+            logger.info("✅ Successfully recovered Selenium driver")
             return True
-            
-        except TimeoutException as e:
-            logger.warning(f"⏱️ Investing.com login page timeout: {e}")
-            logger.warning("Network or page loading issues - proceeding without login")
-            return True
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Unexpected error during Investing.com login: {e}")
-            logger.warning("Proceeding without login - extraction may still work")
-            return True
+        else:
+            logger.error("❌ Failed to recover Selenium driver")
+            return False
     
     def _random_delay(self, retry_count: int = 0):
         """Add random delay between requests with exponential backoff on retries."""
@@ -520,7 +689,7 @@ class TechnicalIndicatorsExtractor:
     
     def _extract_with_selenium(self, url: str) -> Optional[BeautifulSoup]:
         """
-        Extract page content using Selenium for JS-rendered content.
+        Extract page content using Selenium for JS-rendered content with enhanced error handling.
         
         Args:
             url: URL to extract from
@@ -528,7 +697,7 @@ class TechnicalIndicatorsExtractor:
         Returns:
             BeautifulSoup object or None if failed
         """
-        # Skip Selenium if no network access or driver unavailable
+        # Skip Selenium if no network access or driver unavailable  
         if not self.driver:
             self.driver = self._setup_selenium_driver()
             if not self.driver:
@@ -539,32 +708,108 @@ class TechnicalIndicatorsExtractor:
             logger.debug(f"Using cached content for {url}")
             return self.page_cache[url]
             
-        try:
-            logger.info(f"🤖 Attempting to fetch {url} using Selenium WebDriver")
-            
-            # Attempt login to investing.com if credentials are provided and URL is from investing.com
-            if "investing.com" in url.lower() and not self.investing_logged_in:
-                self._login_to_investing_com()
+        # Multiple attempts with recovery
+        max_attempts = 2
+        
+        for attempt in range(1, max_attempts + 1):
+            try:
+                logger.info(f"🤖 Attempting to fetch {url} using Selenium WebDriver (attempt {attempt}/{max_attempts})")
                 
-            self.driver.get(url)
-            
-            # Wait for page to load with shorter timeout
-            WebDriverWait(self.driver, min(self.timeout, 15)).until(
-                EC.presence_of_element_located((By.TAG_NAME, "body"))
-            )
-            
-            # Shorter wait for dynamic content
-            time.sleep(2)
-            
-            soup = BeautifulSoup(self.driver.page_source, 'html.parser')
-            self.page_cache[url] = soup
-            
-            logger.debug(f"Successfully fetched {url} with Selenium")
-            return soup
-            
-        except Exception as e:
-            logger.warning(f"Failed to fetch {url} with Selenium: {e}")
-            return None
+                # Check driver health before use
+                if not self._check_chrome_health(self.driver):
+                    logger.warning(f"Chrome driver unhealthy on attempt {attempt}, attempting recovery...")
+                    if not self._recover_selenium_driver():
+                        logger.error("Failed to recover driver")
+                        if attempt < max_attempts:
+                            continue
+                        else:
+                            return None
+                
+                # Attempt login to investing.com if credentials are provided and URL is from investing.com
+                if "investing.com" in url.lower() and not self.investing_logged_in:
+                    login_success = self._login_to_investing_com()
+                    if not login_success and not self.driver:
+                        # Driver may have been lost during login
+                        logger.warning("Driver lost during login attempt")
+                        if attempt < max_attempts:
+                            continue
+                        else:
+                            return None
+                
+                # Navigate to the target URL
+                try:
+                    self.driver.get(url)
+                except TimeoutException:
+                    logger.warning(f"Page load timeout for {url} on attempt {attempt}")
+                    if attempt < max_attempts:
+                        continue
+                    else:
+                        return None
+                except WebDriverException as e:
+                    if "chrome not reachable" in str(e).lower():
+                        logger.warning(f"Chrome not reachable on attempt {attempt}: {e}")
+                        if attempt < max_attempts and self._recover_selenium_driver():
+                            continue
+                        else:
+                            return None
+                    else:
+                        raise e
+                
+                # Wait for page to load with container-friendly timeout
+                try:
+                    WebDriverWait(self.driver, min(self.timeout, 20)).until(
+                        EC.presence_of_element_located((By.TAG_NAME, "body"))
+                    )
+                except TimeoutException:
+                    logger.warning(f"Body element not found within timeout for {url} on attempt {attempt}")
+                    if attempt < max_attempts:
+                        continue
+                    else:
+                        # Try to get content anyway
+                        pass
+                
+                # Wait for dynamic content with reduced delay for containers
+                time.sleep(1.5)  # Reduced from 2 seconds
+                
+                soup = BeautifulSoup(self.driver.page_source, 'html.parser')
+                self.page_cache[url] = soup
+                
+                logger.debug(f"Successfully fetched {url} with Selenium on attempt {attempt}")
+                return soup
+                
+            except WebDriverException as e:
+                logger.warning(f"WebDriver error on attempt {attempt} for {url}: {e}")
+                
+                # Check for specific error types that require recovery
+                if any(err in str(e).lower() for err in ["chrome not reachable", "session deleted", "chrome crashed"]):
+                    logger.warning(f"Chrome process issue detected on attempt {attempt}")
+                    if attempt < max_attempts:
+                        if self._recover_selenium_driver():
+                            continue
+                        else:
+                            logger.error("Failed to recover from Chrome process issue")
+                            return None
+                    else:
+                        return None
+                        
+                # For other WebDriver errors, continue to next attempt
+                if attempt < max_attempts:
+                    time.sleep(2)  # Brief pause before retry
+                    continue
+                else:
+                    logger.warning(f"All Selenium attempts failed for {url}")
+                    return None
+                    
+            except Exception as e:
+                logger.warning(f"Unexpected error on attempt {attempt} for {url}: {e}")
+                if attempt < max_attempts:
+                    time.sleep(1)
+                    continue
+                else:
+                    logger.warning(f"All attempts failed for {url}")
+                    return None
+        
+        return None
     
     def _extract_numeric_value(self, text: str, pattern: str) -> Optional[float]:
         """
@@ -995,15 +1240,47 @@ class TechnicalIndicatorsExtractor:
             self.cleanup()
     
     def cleanup(self):
-        """Clean up resources."""
+        """Clean up resources with enhanced driver management."""
+        logger.debug("Starting cleanup process...")
+        
         if self.driver:
             try:
-                self.driver.quit()
-            except Exception:
-                pass
-            self.driver = None
+                # Check if driver is still responsive
+                try:
+                    self.driver.execute_script("return document.readyState;")
+                    logger.debug("Driver responsive during cleanup")
+                except Exception:
+                    logger.debug("Driver not responsive during cleanup")
+                
+                # Close all windows and quit
+                try:
+                    self.driver.quit()
+                    logger.debug("Driver quit successfully")
+                except Exception as e:
+                    logger.debug(f"Error during driver quit: {e}")
+                    # Force kill if necessary
+                    try:
+                        self.driver.service.process.terminate()
+                    except Exception:
+                        pass
+                        
+            except Exception as e:
+                logger.debug(f"Error during driver cleanup: {e}")
+            finally:
+                self.driver = None
+                
+        # Clear other resources
         self.page_cache.clear()
         self.investing_logged_in = False
+        
+        # Close requests session
+        if hasattr(self, 'session') and self.session:
+            try:
+                self.session.close()
+            except Exception:
+                pass
+                
+        logger.debug("Cleanup completed")
 
 
 def main():
