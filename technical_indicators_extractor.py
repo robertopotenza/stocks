@@ -128,7 +128,8 @@ class TechnicalIndicatorsExtractor:
             requests_per_minute: Override requests per minute throttle (defaults to env/8)
             cooldown_seconds: Override cooldown applied after throttling responses
         """
-        self.api_key = api_key or os.getenv('TWELVEDATA_API_KEY') or os.getenv('api_key')
+        raw_api_key = api_key or os.getenv('TWELVEDATA_API_KEY') or os.getenv('api_key')
+        self.api_key = self._normalize_api_key(raw_api_key)
         self.delay_min = delay_min
         self.delay_max = delay_max
         self.base_url = "https://api.twelvedata.com"
@@ -155,7 +156,9 @@ class TechnicalIndicatorsExtractor:
             self.cooldown_seconds
         )
         
-        if not self.api_key or self.api_key == "your_twelvedata_api_key":
+        self._api_key_invalid_logged = False
+
+        if not self.api_key:
             logger.warning("No Twelve Data API key provided. Using mock data.")
             self.use_mock_data = True
         else:
@@ -208,11 +211,62 @@ class TechnicalIndicatorsExtractor:
         import random
         delay = random.uniform(self.delay_min, self.delay_max)
         time.sleep(delay)
-    
+
+    @staticmethod
+    def _normalize_api_key(value: Optional[str]) -> Optional[str]:
+        """Return a cleaned API key or ``None`` when the value is effectively missing."""
+
+        if not value:
+            return None
+
+        normalized = value.strip()
+        if not normalized:
+            return None
+
+        placeholder_values = {
+            "your_twelvedata_api_key",
+            "your_api_key",
+            "changeme",
+            "replace_me",
+        }
+
+        lower_normalized = normalized.lower()
+        if lower_normalized in placeholder_values or lower_normalized.startswith("your_"):
+            return None
+
+        return normalized
+
+    def _handle_api_key_error(self, endpoint: str, message: str) -> None:
+        """Switch to mock data when the API reports an API key problem."""
+
+        if self._api_key_invalid_logged:
+            return
+
+        lowered = message.lower()
+        keywords = ["api key", "apikey"]
+        if not any(keyword in lowered for keyword in keywords):
+            return
+
+        error_indicators = ["missing", "not specified", "invalid", "incorrect", "denied"]
+        if not any(indicator in lowered for indicator in error_indicators):
+            return
+
+        logger.error(
+            "🚫 Twelve Data rejected the configured API key while calling %s: %s",
+            endpoint,
+            message,
+        )
+        logger.error("💡 Falling back to mock data for the remainder of this run.")
+        logger.info(
+            "👉 Update the TWELVEDATA_API_KEY environment variable with a valid key from https://twelvedata.com/pricing"
+        )
+        self.use_mock_data = True
+        self._api_key_invalid_logged = True
+
     def _make_api_request(self, endpoint: str, params: Dict[str, str]) -> Optional[Dict]:
         """
         Make a request to the Twelve Data API.
-        
+
         Args:
             endpoint: API endpoint (e.g., 'rsi', 'macd', etc.)
             params: Request parameters
@@ -262,6 +316,7 @@ class TechnicalIndicatorsExtractor:
                 if 'status' in data and data['status'] == 'error':
                     message = data.get('message', 'Unknown error')
                     logger.warning(f"API error for {endpoint}: {message}")
+                    self._handle_api_key_error(endpoint, message)
                     if 'code' in data and str(data['code']) == '429':
                         self.rate_limiter.trigger_cooldown()
                         continue
