@@ -21,6 +21,7 @@ import pandas as pd
 import os
 import sys
 import time
+import socket
 import requests
 from datetime import datetime
 from typing import Dict, List, Any, Optional, Tuple
@@ -85,46 +86,76 @@ class TechnicalIndicatorsExtractor:
         """
         if self.use_mock_data:
             return None
-            
+        
         # Add API key to parameters
         params['apikey'] = self.api_key
         
         url = f"{self.base_url}/{endpoint}"
         
+        # Check DNS resolution first
+        import urllib.parse
+        parsed_url = urllib.parse.urlparse(url)
+        hostname = parsed_url.netloc
+        
         try:
-            response = requests.get(url, params=params, timeout=30)
-            response.raise_for_status()
-            
-            data = response.json()
-            
-            # Check for API error responses
-            if 'status' in data and data['status'] == 'error':
-                logger.warning(f"API error for {endpoint}: {data.get('message', 'Unknown error')}")
-                return None
+            socket.gethostbyname(hostname)
+        except socket.gaierror:
+            logger.error(f"❌ DNS resolution failed for {hostname}")
+            logger.error(f"💡 Network/DNS configuration issue detected.")
+            return None
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                logger.debug(f"API request attempt {attempt + 1}/{max_retries} to {endpoint}")
+                response = requests.get(url, params=params, timeout=30)
+                response.raise_for_status()
                 
-            return data
+                data = response.json()
+                
+                # Check for API error responses
+                if 'status' in data and data['status'] == 'error':
+                    logger.warning(f"API error for {endpoint}: {data.get('message', 'Unknown error')}")
+                    return None
+                    
+                return data
+                
+            except requests.exceptions.ConnectionError as e:
+                logger.error(f"Connection error for {endpoint} (attempt {attempt + 1}/{max_retries}): {e}")
+                if "Failed to resolve" in str(e) or "Name or service not known" in str(e):
+                    logger.error(f"💡 DNS resolution issue detected. Check network configuration.")
+                    return None  # Don't retry DNS issues
+            except requests.exceptions.Timeout as e:
+                logger.warning(f"Timeout for {endpoint} (attempt {attempt + 1}/{max_retries}): {e}")
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"API request failed for {endpoint} (attempt {attempt + 1}/{max_retries}): {e}")
+            except Exception as e:
+                logger.warning(f"Unexpected error for {endpoint} (attempt {attempt + 1}/{max_retries}): {e}")
             
-        except requests.exceptions.RequestException as e:
-            logger.warning(f"API request failed for {endpoint}: {e}")
-            return None
-        except Exception as e:
-            logger.warning(f"Unexpected error for {endpoint}: {e}")
-            return None
+            if attempt < max_retries - 1:
+                wait_time = (2 ** attempt)  # Exponential backoff: 1s, 2s, 4s
+                logger.info(f"Waiting {wait_time}s before retry...")
+                time.sleep(wait_time)
+        
+        logger.error(f"All {max_retries} attempts failed for {endpoint}")
+        return None
     
     def _get_current_price(self, ticker: str) -> Optional[float]:
         """Get current price for a ticker using Twelve Data API."""
         params = {
-            'symbol': ticker,
-            'interval': '1day',
-            'outputsize': '1'
+            'symbol': ticker
         }
         
         data = self._make_api_request('price', params)
         if data and 'price' in data:
             try:
-                return float(data['price'])
-            except (ValueError, TypeError):
-                pass
+                price = float(data['price'])
+                logger.info(f"✅ Got current price for {ticker}: ${price}")
+                return price
+            except (ValueError, TypeError) as e:
+                logger.error(f"Error parsing price for {ticker}: {e}")
+        else:
+            logger.warning(f"No price data received for {ticker}")
         return None
     
     def _calculate_pivot_points(self, high: float, low: float, close: float) -> Dict[str, float]:
