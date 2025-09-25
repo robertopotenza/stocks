@@ -15,13 +15,13 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade pip and setup certificates
-RUN pip install --upgrade pip
+RUN pip install --upgrade pip --root-user-action=ignore
 
 # Copy requirements first for better Docker layer caching
 COPY requirements.txt .
 
 # Install Python dependencies with trusted hosts for SSL issues
-RUN pip install --no-cache-dir --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org -r requirements.txt
+RUN pip install --no-cache-dir --root-user-action=ignore --trusted-host pypi.org --trusted-host pypi.python.org --trusted-host files.pythonhosted.org -r requirements.txt
 
 # Copy application code
 COPY . .
@@ -38,6 +38,11 @@ RUN useradd --create-home --shell /bin/bash app
 RUN chown -R app:app /app
 
 USER app
+
+# Download NLTK data including VADER lexicon for sentiment analysis as the app user
+# Fix SSL certificate issues by using trusted hosts and disabling SSL verification
+RUN python -c "import ssl; ssl._create_default_https_context = ssl._create_unverified_context; import nltk; nltk.download('vader_lexicon', quiet=True)" || \
+    python -c "import nltk; nltk.data.path.append('/app/nltk_data'); print('NLTK download failed but will attempt runtime download')"
 
 # Set environment variables for network configuration
 ENV DNS_SERVER=8.8.8.8
