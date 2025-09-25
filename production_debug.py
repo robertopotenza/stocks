@@ -92,22 +92,110 @@ class ProductionDebugger:
         """Test DNS resolution for target domains."""
         self.print_section("DNS Resolution Check")
         
-        domains = ['www.investing.com', 'google.com', 'github.com']
+        domains = ['api.twelvedata.com', 'www.investing.com', 'google.com', 'github.com']
         results = {}
         
         for domain in domains:
             try:
                 start_time = time.time()
-                ip_address = socket.gethostbyname(domain)
+                ip = socket.gethostbyname(domain)
                 resolve_time = time.time() - start_time
-                print(f"✅ {domain} → {ip_address} ({resolve_time:.3f}s)")
-                results[domain] = {'status': 'success', 'ip': ip_address, 'time': resolve_time}
+                print(f"✅ {domain} -> {ip} ({resolve_time:.3f}s)")
+                results[domain] = {'status': 'success', 'ip': ip, 'time': resolve_time}
             except socket.gaierror as e:
-                print(f"❌ {domain} → DNS Error: {e}")
-                results[domain] = {'status': 'error', 'error': str(e)}
+                print(f"❌ {domain}: DNS resolution failed - {e}")
+                results[domain] = {'status': 'failed', 'error': str(e)}
             except Exception as e:
-                print(f"❌ {domain} → Unexpected Error: {e}")
+                print(f"❌ {domain}: Unexpected error - {e}")
                 results[domain] = {'status': 'error', 'error': str(e)}
+        
+        # Test different DNS servers
+        print(f"\n📋 Testing alternate DNS servers...")
+        for dns_server in self.dns_servers:
+            print(f"\nTesting with DNS server {dns_server}:")
+            try:
+                # This is a basic test - in production you'd want to configure the resolver
+                import subprocess
+                result = subprocess.run(['nslookup', 'api.twelvedata.com', dns_server], 
+                                      capture_output=True, text=True, timeout=10)
+                if result.returncode == 0:
+                    print(f"✅ nslookup via {dns_server} succeeded")
+                else:
+                    print(f"❌ nslookup via {dns_server} failed: {result.stderr}")
+            except Exception as e:
+                print(f"❌ nslookup test failed: {e}")
+        
+        self.results['dns'] = results
+        return results
+    
+    def test_twelve_data_api(self) -> Dict[str, Any]:
+        """Test Twelve Data API specifically with enhanced diagnostics."""
+        self.print_section("Twelve Data API Test")
+        
+        results = {}
+        
+        # Import the enhanced API functions
+        try:
+            import sys
+            sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+            from stock_prices import get_stock_data_from_api, check_dns_resolution, make_api_request_with_retry
+            
+            print("🔄 Testing DNS resolution for api.twelvedata.com...")
+            dns_works = check_dns_resolution('api.twelvedata.com')
+            results['dns_resolution'] = dns_works
+            
+            if not dns_works:
+                print("❌ DNS resolution failed - this is the root cause")
+                print("💡 Recommendations:")
+                print("   - Check /etc/resolv.conf")
+                print("   - Test with: nslookup api.twelvedata.com")
+                print("   - Configure corporate proxy if needed")
+                print("   - Set DNS_SERVER environment variable")
+                results['recommendations'] = [
+                    "Check /etc/resolv.conf DNS configuration",
+                    "Test with nslookup api.twelvedata.com", 
+                    "Configure corporate proxy if behind firewall",
+                    "Set DNS_SERVER environment variable"
+                ]
+            else:
+                print("✅ DNS resolution works")
+                
+                # Test API call without key
+                print("\n🔄 Testing API call without key...")
+                test_url = "https://api.twelvedata.com/price"
+                test_params = {'symbol': 'AAPL'}
+                
+                response = make_api_request_with_retry(test_url, test_params)
+                if response:
+                    print(f"✅ API responded with status {response.status_code}")
+                    print(f"Response: {response.text[:200]}...")
+                    results['api_test_no_key'] = {
+                        'status_code': response.status_code,
+                        'response': response.text[:500]
+                    }
+                else:
+                    print("❌ API call failed")
+                    results['api_test_no_key'] = {'status': 'failed'}
+                
+                # Test with the enhanced stock_prices function
+                print("\n🔄 Testing enhanced stock_prices function...")
+                stock_result = get_stock_data_from_api('AAPL')
+                print(f"Result data source: {stock_result.get('data_source')}")
+                print(f"Result price: {stock_result.get('Current_Price')}")
+                results['stock_prices_test'] = {
+                    'data_source': stock_result.get('data_source'),
+                    'price': stock_result.get('Current_Price')
+                }
+            
+        except ImportError as e:
+            print(f"❌ Could not import enhanced functions: {e}")
+            results['import_error'] = str(e)
+        except Exception as e:
+            print(f"❌ Unexpected error in API test: {e}")
+            results['error'] = str(e)
+        
+        self.results['twelve_data_api'] = results
+        return results
         
         self.results['dns'] = results
         return results
@@ -442,6 +530,7 @@ class ProductionDebugger:
         # Run all diagnostic checks
         self.check_environment_variables()
         self.check_dns_resolution()
+        self.test_twelve_data_api()  # Add the new Twelve Data API test
         self.check_network_connectivity()
         self.check_dependencies()
         self.check_selenium_setup()

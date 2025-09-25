@@ -12,6 +12,8 @@ import requests
 import pandas as pd
 import os
 import sys
+import time
+import socket
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 from technical_analysis import calculate_technical_levels
@@ -23,6 +25,90 @@ logger = get_logger('stocks_app.stock_prices')
 # Configuration variables - can be set via environment variables or modified here
 TWELVEDATA_API_KEY = os.getenv("TWELVEDATA_API_KEY") or os.getenv("api_key", "your_twelvedata_api_key")
 TICKERS_FILE = os.getenv("TICKERS_FILE", "tickers.xlsx")
+
+
+def check_dns_resolution(hostname: str) -> bool:
+    """
+    Check if DNS resolution works for a hostname.
+    
+    Args:
+        hostname: The hostname to resolve
+        
+    Returns:
+        True if DNS resolution succeeds, False otherwise
+    """
+    try:
+        socket.gethostbyname(hostname)
+        return True
+    except socket.gaierror:
+        return False
+
+
+def make_api_request_with_retry(url: str, params: Dict[str, Any], max_retries: int = 3) -> Optional[requests.Response]:
+    """
+    Make API request with retry logic and enhanced error handling.
+    
+    Args:
+        url: The API endpoint URL
+        params: Request parameters
+        max_retries: Maximum number of retry attempts
+        
+    Returns:
+        Response object if successful, None if all retries failed
+    """
+    import urllib.parse
+    
+    # Extract hostname for diagnostics
+    parsed_url = urllib.parse.urlparse(url)
+    hostname = parsed_url.netloc
+    
+    # Check DNS resolution first
+    if not check_dns_resolution(hostname):
+        logger.error(f"❌ DNS resolution failed for {hostname}")
+        logger.error(f"💡 This is likely a network/DNS configuration issue in the production environment.")
+        logger.error(f"💡 Possible solutions:")
+        logger.error(f"   - Check DNS servers in /etc/resolv.conf")
+        logger.error(f"   - Set DNS_SERVER environment variable")
+        logger.error(f"   - Configure corporate proxy if behind firewall")
+        return None
+    
+    for attempt in range(max_retries):
+        try:
+            logger.debug(f"API request attempt {attempt + 1}/{max_retries} to {url}")
+            response = requests.get(url, params=params, timeout=30)
+            
+            if response.status_code == 200:
+                return response
+            elif response.status_code == 429:
+                # Rate limiting - wait longer before retry
+                wait_time = (2 ** attempt) * 2  # Exponential backoff starting at 2 seconds
+                logger.warning(f"Rate limited (429). Waiting {wait_time}s before retry {attempt + 1}/{max_retries}")
+                time.sleep(wait_time)
+                continue
+            else:
+                logger.error(f"API returned status {response.status_code}: {response.text}")
+                if attempt == max_retries - 1:  # Last attempt
+                    return None
+                
+        except requests.exceptions.ConnectionError as e:
+            logger.error(f"Connection error on attempt {attempt + 1}/{max_retries}: {e}")
+            if "Failed to resolve" in str(e) or "Name or service not known" in str(e):
+                logger.error(f"💡 DNS resolution issue detected. Check network configuration.")
+                return None  # Don't retry DNS issues
+        except requests.exceptions.Timeout as e:
+            logger.warning(f"Timeout on attempt {attempt + 1}/{max_retries}: {e}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Request error on attempt {attempt + 1}/{max_retries}: {e}")
+        except Exception as e:
+            logger.error(f"Unexpected error on attempt {attempt + 1}/{max_retries}: {e}")
+        
+        if attempt < max_retries - 1:
+            wait_time = (2 ** attempt)  # Exponential backoff: 1s, 2s, 4s
+            logger.info(f"Waiting {wait_time}s before retry...")
+            time.sleep(wait_time)
+    
+    logger.error(f"All {max_retries} attempts failed for {url}")
+    return None
 
 
 def get_stock_data_from_api(ticker: str) -> Dict[str, Any]:
@@ -39,6 +125,8 @@ def get_stock_data_from_api(ticker: str) -> Dict[str, Any]:
         logger.warning(f"No API key configured, using mock data for {ticker}")
         return get_mock_stock_data(ticker)
     
+    logger.info(f"🔄 Fetching data for {ticker} from Twelve Data API...")
+    
     try:
         # Get current price
         price_url = "https://api.twelvedata.com/price" 
@@ -47,13 +135,26 @@ def get_stock_data_from_api(ticker: str) -> Dict[str, Any]:
             'apikey': TWELVEDATA_API_KEY
         }
         
-        price_response = requests.get(price_url, params=price_params, timeout=30)
+        price_response = make_api_request_with_retry(price_url, price_params)
         current_price = None
         
-        if price_response.status_code == 200:
-            price_data = price_response.json()
-            if 'price' in price_data:
-                current_price = float(price_data['price'])
+        if price_response and price_response.status_code == 200:
+            try:
+                price_data = price_response.json()
+                logger.debug(f"Price API response for {ticker}: {price_data}")
+                
+                # Check for API error in response
+                if 'status' in price_data and price_data['status'] == 'error':
+                    logger.error(f"API error for {ticker} price: {price_data.get('message', 'Unknown error')}")
+                elif 'price' in price_data:
+                    current_price = float(price_data['price'])
+                    logger.info(f"✅ Got price for {ticker}: ${current_price}")
+                else:
+                    logger.warning(f"No 'price' field in response for {ticker}: {price_data}")
+            except (ValueError, TypeError, KeyError) as e:
+                logger.error(f"Error parsing price data for {ticker}: {e}")
+        else:
+            logger.error(f"❌ Failed to get price data for {ticker}")
         
         # Get quote data for additional information
         quote_url = "https://api.twelvedata.com/quote"
@@ -62,11 +163,23 @@ def get_stock_data_from_api(ticker: str) -> Dict[str, Any]:
             'apikey': TWELVEDATA_API_KEY
         }
         
-        quote_response = requests.get(quote_url, params=quote_params, timeout=30)
+        quote_response = make_api_request_with_retry(quote_url, quote_params)
         quote_data = {}
         
-        if quote_response.status_code == 200:
-            quote_data = quote_response.json()
+        if quote_response and quote_response.status_code == 200:
+            try:
+                quote_data = quote_response.json()
+                logger.debug(f"Quote API response for {ticker}: {quote_data}")
+                
+                # Check for API error in response
+                if 'status' in quote_data and quote_data['status'] == 'error':
+                    logger.error(f"API error for {ticker} quote: {quote_data.get('message', 'Unknown error')}")
+                    quote_data = {}  # Reset to empty dict on error
+            except (ValueError, TypeError) as e:
+                logger.error(f"Error parsing quote data for {ticker}: {e}")
+                quote_data = {}
+        else:
+            logger.warning(f"Failed to get quote data for {ticker}")
         
         # Extract data from API response
         stock_data = {
@@ -94,14 +207,18 @@ def get_stock_data_from_api(ticker: str) -> Dict[str, Any]:
             except Exception as e:
                 logger.warning(f"Could not calculate technical levels for {ticker}: {e}")
         
-        logger.info(f"✅ Successfully fetched data for {ticker}: ${current_price}")
+        # Log final result
+        if current_price:
+            logger.info(f"✅ Successfully fetched data for {ticker}: ${current_price}")
+        else:
+            logger.error(f"❌ No price data obtained for {ticker}, falling back to mock data")
+            return get_mock_stock_data(ticker)
+        
         return stock_data
         
-    except requests.exceptions.RequestException as e:
-        logger.error(f"API request failed for {ticker}: {e}")
-        return get_mock_stock_data(ticker)
     except Exception as e:
-        logger.error(f"Error fetching data for {ticker}: {e}")
+        logger.error(f"❌ Unexpected error fetching data for {ticker}: {e}")
+        logger.error(f"💡 Falling back to mock data for {ticker}")
         return get_mock_stock_data(ticker)
 
 
